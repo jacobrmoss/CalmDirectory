@@ -34,7 +34,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     navController: NavController,
-    viewModel: SettingsViewModel = viewModel()
+    viewModel: SettingsViewModel = viewModel(),
+    searchViewModel: SearchViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val userPreferencesRepository = remember { UserPreferencesRepository(context) }

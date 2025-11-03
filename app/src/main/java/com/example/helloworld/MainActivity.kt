@@ -84,7 +84,7 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(paddingValues),
                     ) {
                         composable("main") { MainScreen(navController) }
-                        composable("settings") { SettingsScreen(navController) }
+                        composable("settings") { SettingsScreen(navController, searchViewModel = searchViewModel) }
                         composable(
                             "search?query={query}&autoFocus={autoFocus}",
                             arguments = listOf(
@@ -107,7 +107,7 @@ class MainActivity : ComponentActivity() {
                                 if (autoFocus && !wasFocused) {
                                     focusRequester.requestFocus()
                                     wasFocused = true
-                                }
+                                 }
                             }
                             SearchScreenHost(
                                 navController = navController,
