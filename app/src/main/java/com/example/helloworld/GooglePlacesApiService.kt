@@ -48,18 +48,20 @@ class GooglePlacesApiService(
             Place.Field.WEBSITE_URI
         )
 
-        // Add location restriction for better results
-        val miles = 10.0
-        val latDegrees = miles / 69.0
-        val lonDegrees = miles / (cos(Math.toRadians(lat)) * 69.0)
-        val southwest = LatLng(lat - latDegrees, lon - lonDegrees)
-        val northeast = LatLng(lat + latDegrees, lon + lonDegrees)
-        val locationBias = RectangularBounds.newInstance(southwest, northeast)
+        val requestBuilder = SearchByTextRequest.builder(query, placeFields)
 
-        // Create the request..
-        val request = SearchByTextRequest.builder(query, placeFields)
-            .setLocationBias(locationBias)
-            .build()
+        // Only add location restriction if a valid location is provided
+        if (lat != 0.0 || lon != 0.0) {
+            val miles = 10.0
+            val latDegrees = miles / 69.0
+            val lonDegrees = miles / (cos(Math.toRadians(lat)) * 69.0)
+            val southwest = LatLng(lat - latDegrees, lon - lonDegrees)
+            val northeast = LatLng(lat + latDegrees, lon + lonDegrees)
+            val locationBias = RectangularBounds.newInstance(southwest, northeast)
+            requestBuilder.setLocationBias(locationBias)
+        }
+
+        val request = requestBuilder.build()
 
         return try {
             val response = placesClient!!.searchByText(request).await()

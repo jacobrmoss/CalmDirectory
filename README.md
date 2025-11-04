@@ -444,6 +444,7 @@ CalmDirectory follows MVVM architecture optimized for E-ink rendering:
 2. **Enable APIs:**
    - Enable "Places API (New)"
    - Enable "Places SDK for Android"
+   - Enable "Geocoding API"
 
 3. **Create API Key:**
    - Navigate to Credentials

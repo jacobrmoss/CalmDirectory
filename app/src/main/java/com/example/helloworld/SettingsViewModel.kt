@@ -15,8 +15,8 @@ import kotlinx.coroutines.launch
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val locationService = LocationService(application)
-    private val geocodingService = NominatimGeocodingService()
     private val userPreferencesRepository = UserPreferencesRepository(application)
+    private val geocodingService = GoogleGeocodingService(userPreferencesRepository)
     private val googlePlacesApiService = GooglePlacesApiService(application, userPreferencesRepository)
 
     private val _currentLocation = MutableStateFlow("Fetching location...")

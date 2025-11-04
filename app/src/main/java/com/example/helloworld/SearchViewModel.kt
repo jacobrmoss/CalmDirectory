@@ -18,7 +18,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     private val userPreferencesRepository = UserPreferencesRepository(application)
     private val placesApiService = GooglePlacesApiService(application, userPreferencesRepository)
     private val locationService = LocationService(application)
-    private val nominatimGeocodingService = NominatimGeocodingService()
+    private val geocodingService = GoogleGeocodingService(userPreferencesRepository)
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
@@ -79,7 +79,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         } else {
             val defaultLocation = userPreferencesRepository.defaultLocation.first()
             if (!defaultLocation.isNullOrBlank()) {
-                nominatimGeocodingService.getCoordinates(defaultLocation) ?: (0.0 to 0.0)
+                geocodingService.getCoordinates(defaultLocation) ?: (0.0 to 0.0)
             } else {
                 0.0 to 0.0
             }
