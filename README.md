@@ -4,9 +4,9 @@
 
 ## Screenshots
 
-| Landing Screen | Search Results | Settings Screen |
-|---|---|---|
-| ![Landing Screen](screenshots/landing_screen.png) | ![Search Results](screenshots/search_results.png) | ![Settings Screen](screenshots/settings_screen.png) |
+| Landing Screen | Search Results | POI Details Screen | Settings Screen |
+|---|---|---|---|
+| ![Landing Screen](screenshots/landing_screen.png) | ![Search Results](screenshots/search_results.png) | ![POI Details Screen](screenshots/poi_details_screen.png) | ![Settings Screen](screenshots/settings_screen.png) |
 
 ## Table of Contents
 
@@ -490,7 +490,7 @@ Contributions are welcome! When contributing to CalmDirectory, please keep the f
 
 - Follow existing MVVM patterns
 - Use StateFlow for reactive state
-- Keep ViewModels free of Android framework dependencies
+- Keep ViewM- odels free of Android framework dependencies
 - Document E-ink optimizations in comments
 
 ### Pull Request Process
