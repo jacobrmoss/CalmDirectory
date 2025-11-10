@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Phone
@@ -26,10 +24,12 @@ import androidx.compose.material.icons.sharp.Clear
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,9 +41,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -199,33 +202,46 @@ fun DirectoryTopAppBar(
         TopAppBarMMD(
             title = {
                 when (navBackStackEntry?.destination?.route) {
-                    "main" -> Text("Directory")
-                    "settings" -> Text("Settings")
+                    "main" -> Text("Directory", fontWeight = FontWeight.Bold)
+                    "settings" -> Text("Settings", fontWeight = FontWeight.Bold)
                     "search?query={query}&autoFocus={autoFocus}" -> {
-                        SearchBarDefaultsMMD.InputField(
-                            query = searchQuery,
-                            onQueryChange = { searchViewModel.onSearchQueryChange(it) },
-                            onSearch = { /* Handled by LaunchedEffect */ },
-                            expanded = true,
-                            onExpandedChange = { },
-                            placeholder = { Text("Search for a place") },
-                            trailingIcon = {
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { searchViewModel.onSearchQueryChange("") }) {
-                                        Icon(
-                                            Icons.Sharp.Clear,
-                                            contentDescription = "Clear search"
-                                        )
+                        CompositionLocalProvider(
+                            LocalTextStyle provides TextStyle(
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        ) {
+                            SearchBarDefaultsMMD.InputField(
+                                query = searchQuery,
+                                onQueryChange = { searchViewModel.onSearchQueryChange(it) },
+                                onSearch = { /* Handled by LaunchedEffect */ },
+                                expanded = true,
+                                onExpandedChange = { },
+                                placeholder = { Text("Search for a place") },
+                                trailingIcon = {
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = {
+                                            searchViewModel.onSearchQueryChange(
+                                                ""
+                                            )
+                                        }) {
+                                            Icon(
+                                                Icons.Sharp.Clear,
+                                                contentDescription = "Clear search"
+                                            )
+                                        }
                                     }
-                                }
-                            },
-                            modifier = Modifier.focusRequester(focusRequester)
-                        )
+                                },
+                                modifier = Modifier.focusRequester(focusRequester)
+                            )
+                        }
                     }
                     "details/{poiName}/{poiAddress}/{poiPhone}/{poiDescription}/{poiHours}?poiWebsite={poiWebsite}&lat={lat}&lng={lng}" -> {
                         val poiName = navBackStackEntry.arguments?.getString("poiName")
                         Text(
                             text = URLDecoder.decode(poiName, StandardCharsets.UTF_8.toString()),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
