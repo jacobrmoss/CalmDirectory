@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.helloworld.data.MapApp
+import com.example.helloworld.data.SearchProvider
 import com.example.helloworld.data.UserPreferencesRepository
 import com.mudita.mmd.components.bottom_sheet.ModalBottomSheetMMD
 import com.mudita.mmd.components.bottom_sheet.rememberModalBottomSheetMMDState
@@ -48,11 +49,14 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val userPreferencesRepository = remember { UserPreferencesRepository(context) }
-    val apiKey by userPreferencesRepository.apiKey.collectAsState(initial = "")
-    var newApiKey by remember(apiKey) { mutableStateOf(apiKey ?: "") }
+    val googleApiKey by userPreferencesRepository.googleApiKey.collectAsState(initial = "")
+    var newGoogleApiKey by remember(googleApiKey) { mutableStateOf(googleApiKey ?: "") }
+    val geoapifyApiKey by userPreferencesRepository.geoapifyApiKey.collectAsState(initial = "")
+    var newGeoapifyApiKey by remember(geoapifyApiKey) { mutableStateOf(geoapifyApiKey ?: "") }
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostStateMMD() }
-    var isEditing by remember(apiKey) { mutableStateOf(apiKey.isNullOrEmpty()) }
+    var isEditingGoogleKey by remember(googleApiKey) { mutableStateOf(googleApiKey.isNullOrEmpty()) }
+    var isEditingGeoapifyKey by remember(geoapifyApiKey) { mutableStateOf(geoapifyApiKey.isNullOrEmpty()) }
     val currentLocation by viewModel.currentLocation.collectAsState()
     val useDeviceLocation by viewModel.useDeviceLocation.collectAsState(initial = true)
     val defaultLocation by viewModel.defaultLocation.collectAsState(initial = "")
@@ -64,6 +68,7 @@ fun SettingsScreen(
     }
     val locationSuggestions by viewModel.locationSuggestions.collectAsState()
     val mapApp by userPreferencesRepository.mapApp.collectAsState(initial = MapApp.DEFAULT)
+    val searchProvider by userPreferencesRepository.searchProvider.collectAsState(initial = SearchProvider.GOOGLE_PLACES)
     var openBottomSheet by rememberSaveable { mutableStateOf(false) }
     val bottomSheetState = rememberModalBottomSheetMMDState()
 
@@ -120,38 +125,78 @@ fun SettingsScreen(
 
 
     Column(modifier = Modifier.padding(16.dp)) {
-        if (isEditing) {
+        // Google Places API key section
+        Text(
+            text = "Google Places API Key:",
+            fontSize = 16.sp,
+        )
+        Spacer(modifier = Modifier.padding(4.dp))
+
+        if (isEditingGoogleKey) {
             TextFieldMMD(
-                value = newApiKey,
-                onValueChange = { newApiKey = it },
-                label = { Text("API Key") }
+                value = newGoogleApiKey,
+                onValueChange = { newGoogleApiKey = it },
+                label = { Text("Google Places API Key") }
             )
 
             Spacer(modifier = Modifier.padding(8.dp))
 
             ButtonMMD(onClick = {
                 coroutineScope.launch {
-                    userPreferencesRepository.saveApiKey(newApiKey)
-                    snackbarHostState.showSnackbar("API Key saved successfully")
-                    isEditing = false
+                    userPreferencesRepository.saveGoogleApiKey(newGoogleApiKey.trim())
+                    snackbarHostState.showSnackbar("Google Places API Key saved successfully")
+                    isEditingGoogleKey = false
                 }
             }) {
                 Text("Save")
             }
         } else {
             Text(
-                text = "API Key:",
-                fontSize = 16.sp,
-            )
-            Spacer(modifier = Modifier.padding(4.dp))
-
-            Text(
-                text = maskApiKey(apiKey ?: ""),
+                text = maskApiKey(googleApiKey ?: ""),
                 fontSize = 14.sp,
             )
             Spacer(modifier = Modifier.padding(8.dp))
 
-            ButtonMMD(onClick = { isEditing = true }) {
+            ButtonMMD(onClick = { isEditingGoogleKey = true }) {
+                Text("Edit")
+            }
+        }
+
+        Spacer(modifier = Modifier.padding(16.dp))
+
+        // Geoapify API key section
+        Text(
+            text = "Geoapify API Key:",
+            fontSize = 16.sp,
+        )
+        Spacer(modifier = Modifier.padding(4.dp))
+
+        if (isEditingGeoapifyKey) {
+            TextFieldMMD(
+                value = newGeoapifyApiKey,
+                onValueChange = { newGeoapifyApiKey = it },
+                label = { Text("Geoapify API Key") }
+            )
+
+            Spacer(modifier = Modifier.padding(8.dp))
+
+            ButtonMMD(onClick = {
+                coroutineScope.launch {
+                    userPreferencesRepository.saveGeoapifyApiKey(newGeoapifyApiKey.trim())
+                    snackbarHostState.showSnackbar("Geoapify API Key saved successfully")
+                    isEditingGeoapifyKey = false
+                }
+            }) {
+                Text("Save")
+            }
+        } else {
+            Text(
+                text = if (geoapifyApiKey.isNullOrEmpty()) "Not set" else maskApiKey(geoapifyApiKey ?: ""),
+                fontSize = 14.sp,
+            )
+            Spacer(modifier = Modifier.padding(8.dp))
+
+            ButtonMMD(onClick = { isEditingGeoapifyKey = true }) {
                 Text("Edit")
             }
         }
@@ -165,6 +210,49 @@ fun SettingsScreen(
             color = MaterialTheme.colorScheme.outlineVariant
         )
         Spacer(modifier = Modifier.padding(8.dp))
+
+        // Search backend selection
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(text = "Search backend", fontSize = 16.sp)
+            Spacer(modifier = Modifier.padding(4.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+            ) {
+                RadioButton(
+                    selected = searchProvider == SearchProvider.GOOGLE_PLACES,
+                    onClick = {
+                        coroutineScope.launch {
+                            userPreferencesRepository.saveSearchProvider(SearchProvider.GOOGLE_PLACES)
+                            snackbarHostState.showSnackbar("Using Google Places backend")
+                        }
+                    }
+                )
+                Text(text = "Google Places", modifier = Modifier.padding(start = 8.dp))
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+            ) {
+                RadioButton(
+                    selected = searchProvider == SearchProvider.GEOAPIFY,
+                    onClick = {
+                        coroutineScope.launch {
+                            userPreferencesRepository.saveSearchProvider(SearchProvider.GEOAPIFY)
+                            snackbarHostState.showSnackbar("Using Geoapify backend")
+                        }
+                    }
+                )
+                Text(text = "Geoapify", modifier = Modifier.padding(start = 8.dp))
+            }
+        }
+
+        Spacer(modifier = Modifier.padding(16.dp))
+
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(text = "Search Radius: ${sliderValue.toInt()} miles")
 

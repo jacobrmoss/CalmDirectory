@@ -4,8 +4,12 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.helloworld.data.SearchProvider
 import com.example.helloworld.data.UserPreferencesRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,9 +20,13 @@ import kotlinx.coroutines.launch
 
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
     private val userPreferencesRepository = UserPreferencesRepository(application)
-    private val placesApiService = GooglePlacesApiService(application, userPreferencesRepository)
+    private val googleBackend: PlacesBackend = GooglePlacesApiService(application, userPreferencesRepository)
+    private val geoapifyBackend: PlacesBackend = GeoapifyPlacesApiService(userPreferencesRepository)
+    @Volatile
+    private var currentBackend: PlacesBackend = googleBackend
     private val locationService = LocationService(application)
-    private val geocodingService = GoogleGeocodingService(userPreferencesRepository)
+    private val googleGeocodingService = GoogleGeocodingService(userPreferencesRepository)
+    private val geoapifyGeocodingService = GeoapifyGeocodingService(userPreferencesRepository)
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
@@ -31,8 +39,12 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
     private var searchJob: Job? = null
     private var cachedLocation: Pair<Double, Double>? = null
+    private var locationDeferred: Deferred<Pair<Double, Double>>? = null
 
     init {
+        // Warm up location cache once when the ViewModel is created.
+        prefetchLocation()
+
         // Observe preference changes to automatically invalidate the location cache.
         viewModelScope.launch {
             // Any change in either location-related preference will trigger a cache invalidation.
@@ -41,6 +53,16 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 .collect {
                     invalidateLocation()
                 }
+        }
+
+        // Observe search provider changes to switch backends dynamically.
+        viewModelScope.launch {
+            userPreferencesRepository.searchProvider.collect { provider ->
+                currentBackend = when (provider) {
+                    SearchProvider.GOOGLE_PLACES -> googleBackend
+                    SearchProvider.GEOAPIFY -> geoapifyBackend
+                }
+            }
         }
     }
 
@@ -52,11 +74,26 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
             searchJob = viewModelScope.launch {
                 delay(300L) // Debounce for 300 milliseconds
                 try {
+                    val locationStart = System.currentTimeMillis()
                     val (lat, lon) = getOrFetchLocation()
-                    val results = placesApiService.search(query, lat, lon)
+                    val locationDuration = System.currentTimeMillis() - locationStart
+                    Log.d(
+                        "SearchViewModel",
+                        "query='${query.trim()}', lat=$lat, lon=$lon, backend=${currentBackend.javaClass.simpleName}, locationTimeMs=$locationDuration"
+                    )
+                    val searchStart = System.currentTimeMillis()
+                    val results = currentBackend.search(query, lat, lon)
+                    val searchDuration = System.currentTimeMillis() - searchStart
+                    Log.d("SearchViewModel", "Search returned ${results.size} results in ${searchDuration} ms")
                     _searchResults.value = results
                 } catch (e: SecurityException) {
                     Log.e("SearchViewModel", "Location permission not granted", e)
+                    _searchResults.value = emptyList()
+                } catch (e: CancellationException) {
+                    // Expected when a newer query cancels the previous one
+                    Log.d("SearchViewModel", "Search cancelled", e)
+                } catch (e: Exception) {
+                    Log.e("SearchViewModel", "Search failed", e)
                     _searchResults.value = emptyList()
                 } finally {
                     _isLoading.value = false
@@ -68,28 +105,43 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private suspend fun getOrFetchLocation(): Pair<Double, Double> {
-        if (cachedLocation != null) {
-            return cachedLocation!!
+        cachedLocation?.let { return it }
+
+        val existing = locationDeferred
+        if (existing != null && existing.isActive) {
+            return existing.await()
         }
 
-        val useDeviceLocation = userPreferencesRepository.useDeviceLocation.first()
-        val location = if (useDeviceLocation) {
-            val deviceLocation = locationService.getCurrentLocation()
-            (deviceLocation?.latitude ?: 0.0) to (deviceLocation?.longitude ?: 0.0)
-        } else {
-            val defaultLocation = userPreferencesRepository.defaultLocation.first()
-            if (!defaultLocation.isNullOrBlank()) {
-                geocodingService.getCoordinates(defaultLocation) ?: (0.0 to 0.0)
+        val deferred = viewModelScope.async {
+            val useDeviceLocation = userPreferencesRepository.useDeviceLocation.first()
+            val location = if (useDeviceLocation) {
+                val deviceLocation = locationService.getCurrentLocation()
+                (deviceLocation?.latitude ?: 0.0) to (deviceLocation?.longitude ?: 0.0)
             } else {
-                0.0 to 0.0
+                val defaultLocation = userPreferencesRepository.defaultLocation.first()
+                if (!defaultLocation.isNullOrBlank()) {
+                    val provider = userPreferencesRepository.searchProvider.first()
+                    val coords = when (provider) {
+                        SearchProvider.GOOGLE_PLACES ->
+                            googleGeocodingService.getCoordinates(defaultLocation)
+                        SearchProvider.GEOAPIFY ->
+                            geoapifyGeocodingService.getCoordinates(defaultLocation)
+                    }
+                    coords ?: (0.0 to 0.0)
+                } else {
+                    0.0 to 0.0
+                }
             }
+            cachedLocation = location
+            location
         }
-        cachedLocation = location
-        return location
+        locationDeferred = deferred
+        return deferred.await()
     }
 
     private fun invalidateLocation() {
         cachedLocation = null
+        locationDeferred = null
         prefetchLocation()
     }
 
