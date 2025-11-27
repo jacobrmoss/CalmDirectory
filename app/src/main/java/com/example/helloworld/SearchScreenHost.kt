@@ -15,6 +15,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
 import java.net.URLEncoder
+import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
 @Composable
@@ -44,7 +45,10 @@ fun SearchScreenHost(
     }
 
     LaunchedEffect(query) {
-        searchViewModel.onSearchQueryChange(query)
+        // `query` comes from a URL parameter (e.g. "Gas+Stations"). Decode it so that
+        // backend mappings and UI see a human-readable string like "Gas Stations".
+        val decodedQuery = URLDecoder.decode(query, StandardCharsets.UTF_8.toString())
+        searchViewModel.onSearchQueryChange(decodedQuery)
     }
 
     if (isLoading) {
