@@ -77,7 +77,7 @@ class GooglePlacesApiService(
                     name = place.name ?: "N/A",
                     address = parseAddress(place.address),
                     hours = place.openingHours?.weekdayText ?: emptyList(),
-                    phone = place.phoneNumber?.let { formatPhoneNumber(it) } ?: "N/A",
+                    phone = place.phoneNumber?.let { formatPhoneNumber(it) },
                     description = place.placeTypes?.joinToString(", ") ?: "N/A",
                     website = place.websiteUri?.toString(),
                     lat = place.latLng?.latitude,

@@ -21,8 +21,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val userPreferencesRepository = UserPreferencesRepository(application)
     private val googleGeocodingService = GoogleGeocodingService(userPreferencesRepository)
     private val geoapifyGeocodingService = GeoapifyGeocodingService(userPreferencesRepository)
+    private val hereGeocodingService = HereGeocodingService(userPreferencesRepository)
     private val googleBackend: PlacesBackend = GooglePlacesApiService(application, userPreferencesRepository)
     private val geoapifyBackend: PlacesBackend = GeoapifyPlacesApiService(userPreferencesRepository)
+    private val hereBackend: PlacesBackend = HerePlacesApiService(userPreferencesRepository)
     @Volatile
     private var currentBackend: PlacesBackend = googleBackend
 
@@ -46,6 +48,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 currentBackend = when (provider) {
                     SearchProvider.GOOGLE_PLACES -> googleBackend
                     SearchProvider.GEOAPIFY -> geoapifyBackend
+                    SearchProvider.HERE -> hereBackend
                 }
             }
         }
@@ -67,6 +70,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                                 googleGeocodingService.getAddress(location.latitude, location.longitude)
                             SearchProvider.GEOAPIFY ->
                                 geoapifyGeocodingService.getAddress(location.latitude, location.longitude)
+                            SearchProvider.HERE ->
+                                hereGeocodingService.getAddress(location.latitude, location.longitude)
                         }
                         _currentLocation.value = address ?: "Address not found"
                     } else {

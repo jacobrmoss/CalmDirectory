@@ -24,6 +24,7 @@ android {
         versionName "1.0"
 
         buildConfigField "String", "GEOAPIFY_API_KEY", "\"${localProperties.getProperty('GEOAPIFY_API_KEY', '')}\""
+        buildConfigField "String", "HERE_API_KEY", "\"${localProperties.getProperty('HERE_API_KEY', '')}\""
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

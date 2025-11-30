@@ -163,41 +163,60 @@ fun SettingsScreen(
                     Text(text = "Geoapify", modifier = Modifier.padding(start = 8.dp))
                 }
 
-                Spacer(modifier = Modifier.padding(16.dp))
-
-                Text(
-                    text = "Google Places API Key:",
-                    fontSize = 16.sp,
-                )
-                Spacer(modifier = Modifier.padding(4.dp))
-
-                if (isEditingGoogleKey) {
-                    TextFieldMMD(
-                        value = newGoogleApiKey,
-                        onValueChange = { newGoogleApiKey = it },
-                        label = { Text("Google Places API Key") }
-                    )
-
-                    Spacer(modifier = Modifier.padding(8.dp))
-
-                    ButtonMMD(onClick = {
-                        coroutineScope.launch {
-                            userPreferencesRepository.saveGoogleApiKey(newGoogleApiKey.trim())
-                            snackbarHostState.showSnackbar("Google Places API Key saved successfully")
-                            isEditingGoogleKey = false
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                ) {
+                    RadioButton(
+                        selected = searchProvider == SearchProvider.HERE,
+                        onClick = {
+                            coroutineScope.launch {
+                                userPreferencesRepository.saveSearchProvider(SearchProvider.HERE)
+                                snackbarHostState.showSnackbar("Using HERE backend")
+                            }
                         }
-                    }) {
-                        Text("Save")
-                    }
-                } else {
-                    Text(
-                        text = maskApiKey(googleApiKey ?: ""),
-                        fontSize = 14.sp,
                     )
-                    Spacer(modifier = Modifier.padding(8.dp))
+                    Text(text = "HERE", modifier = Modifier.padding(start = 8.dp))
+                }
 
-                    ButtonMMD(onClick = { isEditingGoogleKey = true }) {
-                        Text("Edit")
+                if (searchProvider == SearchProvider.GOOGLE_PLACES) {
+                    Spacer(modifier = Modifier.padding(16.dp))
+
+                    Text(
+                        text = "Google Places API Key:",
+                        fontSize = 16.sp,
+                    )
+                    Spacer(modifier = Modifier.padding(4.dp))
+
+                    if (isEditingGoogleKey) {
+                        TextFieldMMD(
+                            value = newGoogleApiKey,
+                            onValueChange = { newGoogleApiKey = it },
+                            label = { Text("Google Places API Key") }
+                        )
+
+                        Spacer(modifier = Modifier.padding(8.dp))
+
+                        ButtonMMD(onClick = {
+                            coroutineScope.launch {
+                                userPreferencesRepository.saveGoogleApiKey(newGoogleApiKey.trim())
+                                snackbarHostState.showSnackbar("Google Places API Key saved successfully")
+                                isEditingGoogleKey = false
+                            }
+                        }) {
+                            Text("Save")
+                        }
+                    } else {
+                        Text(
+                            text = maskApiKey(googleApiKey ?: ""),
+                            fontSize = 14.sp,
+                        )
+                        Spacer(modifier = Modifier.padding(8.dp))
+
+                        ButtonMMD(onClick = { isEditingGoogleKey = true }) {
+                            Text("Edit")
+                        }
                     }
                 }
 
@@ -268,8 +287,11 @@ fun SettingsScreen(
 
         if (!useDeviceLocation) {
             item {
-                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
                     if (isEditingLocation) {
                         TextFieldMMD(
                             value = newDefaultLocation,
@@ -279,6 +301,7 @@ fun SettingsScreen(
                             },
                             label = { Text("Default Location") }
                         )
+
                         locationSuggestions.forEach { suggestion ->
                             Card(
                                 modifier = Modifier
@@ -331,19 +354,21 @@ fun SettingsScreen(
             }
         } else {
             item {
-                Text(
-                    text = "Current Location:",
-                    fontSize = 16.sp,
-                )
-            }
-            item {
-                Spacer(modifier = Modifier.padding(4.dp))
-            }
-            item {
-                Text(
-                    text = currentLocation,
-                    fontSize = 14.sp,
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    Text(
+                        text = "Current Location:",
+                        fontSize = 16.sp,
+                    )
+                    Spacer(modifier = Modifier.padding(4.dp))
+                    Text(
+                        text = currentLocation,
+                        fontSize = 14.sp,
+                    )
+                }
             }
         }
 

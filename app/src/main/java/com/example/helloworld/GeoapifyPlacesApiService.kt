@@ -23,8 +23,6 @@ class GeoapifyPlacesApiService(
     private val defaultCategories =
         "catering,commercial,service,entertainment,leisure,accommodation,amenity"
 
-    // Optional top-level Geoapify category chosen by the user for free-text
-    // searches (e.g. "catering", "commercial", ...).
     @Volatile
     private var selectedTopLevelCategory: String? = null
 
@@ -100,14 +98,19 @@ class GeoapifyPlacesApiService(
             val trimmedQuery = query.trim()
             val categoriesForQuery = mapQueryToCategories(trimmedQuery)
 
+            // Treat (0,0) as an invalid location and avoid issuing a global, unconstrained query.
+            if (lat == 0.0 && lon == 0.0) {
+                Log.w(
+                    "GeoapifyPlacesApiService",
+                    "Skipping search: invalid location (0,0); configure device or default location"
+                )
+                return emptyList()
+            }
+
             val httpStart = System.currentTimeMillis()
             val response: GeoapifyPlacesResponse = client.get("https://api.geoapify.com/v2/places") {
                 parameter("apiKey", apiKey)
 
-                // Choose categories in order of specificity:
-                // 1) Exact mapping based on the query text (e.g. "Restaurants")
-                // 2) User-selected top-level Geoapify category (e.g. "catering")
-                // 3) Broad default category set.
                 val effectiveCategories = when {
                     categoriesForQuery != null -> categoriesForQuery
                     selectedTopLevelCategory != null -> selectedTopLevelCategory!!
@@ -115,7 +118,7 @@ class GeoapifyPlacesApiService(
                 }
                 parameter("categories", effectiveCategories)
                 parameter("limit", 30)
-                if (trimmedQuery.isNotEmpty() && categoriesForQuery == null) {
+                if (trimmedQuery.isNotEmpty()) {
                     parameter("name", trimmedQuery)
                 }
                 if (lat != 0.0 || lon != 0.0) {
@@ -144,15 +147,31 @@ class GeoapifyPlacesApiService(
                     country = props.country ?: ""
                 )
 
+                val hoursList = props.openingHours
+                    ?.split(";")
+                    ?.map { it.trim() }
+                    ?.filter { it.isNotEmpty() }
+                    ?: emptyList()
+
+                val rawPhone = props.contact?.phone
+                    ?: props.contact?.phoneOther?.firstOrNull()
+                    ?: props.phone
+
+                Log.d(
+                    "GeoapifyPlacesApiService",
+                    "POI '" + name + "' rawPhone='" + (rawPhone ?: "null") + "' opening_hours='" + (props.openingHours ?: "null") + "'"
+                )
+
                 Poi(
                     name = name,
                     address = address,
-                    hours = emptyList(),
-                    phone = props.phone,
+                    hours = hoursList,
+                    phone = rawPhone,
                     description = props.categories?.joinToString(", ") ?: "",
                     website = props.website,
                     lat = feature.geometry.coordinates.getOrNull(1),
-                    lng = feature.geometry.coordinates.getOrNull(0)
+                    lng = feature.geometry.coordinates.getOrNull(0),
+                    geoapifyPlaceId = props.placeId
                 )
             }
 
@@ -191,6 +210,63 @@ class GeoapifyPlacesApiService(
             emptyList()
         }
     }
+
+    /**
+     * Fetch richer details for a single place using the Geoapify Place Details API.
+     * Returns a [Poi] with phone/hours populated when available, or null if not found.
+     */
+    suspend fun getPlaceDetails(placeId: String): Poi? {
+        val apiKey = getApiKey() ?: return null
+
+        return try {
+            val httpStart = System.currentTimeMillis()
+            val response: GeoapifyPlaceDetailsResponse = client.get("https://api.geoapify.com/v2/place-details") {
+                parameter("apiKey", apiKey)
+                parameter("id", placeId)
+            }.body()
+            val httpDuration = System.currentTimeMillis() - httpStart
+            Log.d("GeoapifyPlacesApiService", "getPlaceDetails placeId=$placeId features=${response.features.size} httpMs=$httpDuration")
+
+            val feature = response.features.firstOrNull() ?: return null
+            val props = feature.properties
+            val name = props.name ?: props.street ?: return null
+
+            val address = Address(
+                street = listOfNotNull(props.street, props.housenumber)
+                    .joinToString(" ")
+                    .ifBlank { "" },
+                city = props.city ?: "",
+                state = props.state ?: "",
+                zip = props.postcode ?: "",
+                country = props.country ?: ""
+            )
+
+            val hoursList = props.openingHours
+                ?.split(";")
+                ?.map { it.trim() }
+                ?.filter { it.isNotEmpty() }
+                ?: emptyList()
+
+            val rawPhone = props.contact?.phone
+                ?: props.contact?.phoneOther?.firstOrNull()
+                ?: props.phone
+
+            Poi(
+                name = name,
+                address = address,
+                hours = hoursList,
+                phone = rawPhone,
+                description = props.categories?.joinToString(", ") ?: "",
+                website = props.website,
+                lat = null,
+                lng = null,
+                geoapifyPlaceId = props.placeId
+            )
+        } catch (e: Exception) {
+            Log.e("GeoapifyPlacesApiService", "Error getting Geoapify place details", e)
+            null
+        }
+    }
 }
 
 private data class CategoryMapping(
@@ -218,9 +294,18 @@ private data class GeoapifyPlaceProperties(
     val state: String? = null,
     val postcode: String? = null,
     val country: String? = null,
+    @SerialName("place_id") val placeId: String? = null,
     val phone: String? = null,
     val website: String? = null,
-    val categories: List<String>? = null
+    val categories: List<String>? = null,
+    @SerialName("opening_hours") val openingHours: String? = null,
+    val contact: GeoapifyContact? = null
+)
+
+@Serializable
+private data class GeoapifyContact(
+    val phone: String? = null,
+    @SerialName("phone_other") val phoneOther: List<String>? = null
 )
 
 @Serializable
@@ -236,6 +321,16 @@ private data class GeoapifyAutocompleteResponse(
 @Serializable
 private data class GeoapifyAutocompleteFeature(
     val properties: GeoapifyAutocompleteProperties
+)
+
+@Serializable
+private data class GeoapifyPlaceDetailsResponse(
+    val features: List<GeoapifyPlaceDetailsFeature> = emptyList()
+)
+
+@Serializable
+private data class GeoapifyPlaceDetailsFeature(
+    val properties: GeoapifyPlaceProperties
 )
 
 @Serializable

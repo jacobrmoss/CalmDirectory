@@ -22,11 +22,13 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     private val userPreferencesRepository = UserPreferencesRepository(application)
     private val googleBackend: PlacesBackend = GooglePlacesApiService(application, userPreferencesRepository)
     private val geoapifyBackend: PlacesBackend = GeoapifyPlacesApiService(userPreferencesRepository)
+    private val hereBackend: PlacesBackend = HerePlacesApiService(userPreferencesRepository)
     @Volatile
     private var currentBackend: PlacesBackend = googleBackend
     private val locationService = LocationService(application)
     private val googleGeocodingService = GoogleGeocodingService(userPreferencesRepository)
     private val geoapifyGeocodingService = GeoapifyGeocodingService(userPreferencesRepository)
+    private val hereGeocodingService = HereGeocodingService(userPreferencesRepository)
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
@@ -69,6 +71,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 currentBackend = when (provider) {
                     SearchProvider.GOOGLE_PLACES -> googleBackend
                     SearchProvider.GEOAPIFY -> geoapifyBackend
+                    SearchProvider.HERE -> hereBackend
                 }
             }
         }
@@ -119,6 +122,13 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun resetSearch() {
+        searchJob?.cancel()
+        _searchQuery.value = ""
+        _searchResults.value = emptyList()
+        _isLoading.value = false
+    }
+
     private suspend fun getOrFetchLocation(): Pair<Double, Double> {
         cachedLocation?.let { return it }
 
@@ -141,11 +151,19 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                             googleGeocodingService.getCoordinates(defaultLocation)
                         SearchProvider.GEOAPIFY ->
                             geoapifyGeocodingService.getCoordinates(defaultLocation)
+                        SearchProvider.HERE ->
+                            hereGeocodingService.getCoordinates(defaultLocation)
                     }
                     coords ?: (0.0 to 0.0)
                 } else {
                     0.0 to 0.0
                 }
+            }
+            if (location.first == 0.0 && location.second == 0.0) {
+                Log.w(
+                    "SearchViewModel",
+                    "Using fallback location (0,0); no valid device or default location available"
+                )
             }
             cachedLocation = location
             location

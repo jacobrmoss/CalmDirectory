@@ -30,6 +30,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             SearchProvider.GOOGLE_PLACES -> googleKey
             // Geoapify key is provided via BuildConfig from local.properties
             SearchProvider.GEOAPIFY -> BuildConfig.GEOAPIFY_API_KEY
+            // HERE key is also provided via BuildConfig from local.properties
+            SearchProvider.HERE -> BuildConfig.HERE_API_KEY
         }
     }
 

@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets
 @Composable
 fun MainScreen(
     navController: NavController,
+    searchViewModel: SearchViewModel? = null,
     mainViewModel: MainViewModel = viewModel()
 ) {
     val apiKey by mainViewModel.apiKey.collectAsState()
@@ -53,6 +54,7 @@ fun MainScreen(
             LandingScreen(
                 modifier = Modifier,
                 onCategorySelected = { category ->
+                    searchViewModel?.resetSearch()
                     val encodedCategory =
                         URLEncoder.encode(category, StandardCharsets.UTF_8.toString())
                     navController.navigate("search?query=$encodedCategory&autoFocus=false")
@@ -94,9 +96,7 @@ fun LocationPermissionRequest(onPermissionGranted: () -> Unit) {
     }
 
     if (!permissionGranted) {
-        Button(onClick = { launcher.launch(permission) }) {
-            Text("Request Location Permission")
-        }
+        null;
     } else {
         onPermissionGranted()
     }
