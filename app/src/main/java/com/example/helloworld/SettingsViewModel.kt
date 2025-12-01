@@ -6,7 +6,10 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.helloworld.data.SearchProvider
 import com.example.helloworld.data.UserPreferencesRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -16,8 +19,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private val locationService = LocationService(application)
     private val userPreferencesRepository = UserPreferencesRepository(application)
-    private val geocodingService = GoogleGeocodingService(userPreferencesRepository)
-    private val googlePlacesApiService = GooglePlacesApiService(application, userPreferencesRepository)
+    private val googleGeocodingService = GoogleGeocodingService(userPreferencesRepository)
+    private val geoapifyGeocodingService = GeoapifyGeocodingService(userPreferencesRepository)
+    private val hereGeocodingService = HereGeocodingService(userPreferencesRepository)
+    private val googleBackend: PlacesBackend = GooglePlacesApiService(application, userPreferencesRepository)
+    private val geoapifyBackend: PlacesBackend = GeoapifyPlacesApiService(userPreferencesRepository)
+    private val hereBackend: PlacesBackend = HerePlacesApiService(userPreferencesRepository)
+    @Volatile
+    private var currentBackend: PlacesBackend = googleBackend
 
     private val _currentLocation = MutableStateFlow("Fetching location...")
     val currentLocation: StateFlow<String> = _currentLocation
@@ -25,11 +34,24 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _locationSuggestions = MutableStateFlow<List<String>>(emptyList())
     val locationSuggestions: StateFlow<List<String>> = _locationSuggestions
 
+    private var autocompleteJob: Job? = null
+
     val useDeviceLocation = userPreferencesRepository.useDeviceLocation
     val defaultLocation = userPreferencesRepository.defaultLocation
 
     init {
         fetchLocation()
+
+        // Observe search provider changes to switch autocomplete backend.
+        viewModelScope.launch {
+            userPreferencesRepository.searchProvider.collect { provider ->
+                currentBackend = when (provider) {
+                    SearchProvider.GOOGLE_PLACES -> googleBackend
+                    SearchProvider.GEOAPIFY -> geoapifyBackend
+                    SearchProvider.HERE -> hereBackend
+                }
+            }
+        }
     }
 
     private fun fetchLocation() {
@@ -42,7 +64,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 ) {
                     val location = locationService.getCurrentLocation()
                     if (location != null) {
-                        val address = geocodingService.getAddress(location.latitude, location.longitude)
+                        val provider = userPreferencesRepository.searchProvider.first()
+                        val address = when (provider) {
+                            SearchProvider.GOOGLE_PLACES ->
+                                googleGeocodingService.getAddress(location.latitude, location.longitude)
+                            SearchProvider.GEOAPIFY ->
+                                geoapifyGeocodingService.getAddress(location.latitude, location.longitude)
+                            SearchProvider.HERE ->
+                                hereGeocodingService.getAddress(location.latitude, location.longitude)
+                        }
                         _currentLocation.value = address ?: "Address not found"
                     } else {
                         _currentLocation.value = "Location not available"
@@ -73,12 +103,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun onDefaultLocationChange(query: String) {
-        viewModelScope.launch {
-            if (query.isNotEmpty()) {
-                _locationSuggestions.value = googlePlacesApiService.getAutocompleteSuggestions(query)
-            } else {
-                _locationSuggestions.value = emptyList()
-            }
+        autocompleteJob?.cancel()
+        if (query.isEmpty()) {
+            _locationSuggestions.value = emptyList()
+            return
+        }
+        autocompleteJob = viewModelScope.launch {
+            delay(300L)
+            _locationSuggestions.value = currentBackend.autocomplete(query)
         }
     }
 }

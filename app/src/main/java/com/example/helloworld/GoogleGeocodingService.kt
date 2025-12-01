@@ -26,7 +26,7 @@ class GoogleGeocodingService(private val userPreferencesRepository: UserPreferen
     }
 
     suspend fun getCoordinates(address: String): Pair<Double, Double>? {
-        val apiKey = userPreferencesRepository.apiKey.first()
+        val apiKey = userPreferencesRepository.googleApiKey.first()
         if (apiKey.isNullOrEmpty()) {
             return null
         }
@@ -45,7 +45,7 @@ class GoogleGeocodingService(private val userPreferencesRepository: UserPreferen
     }
 
     suspend fun getAddress(lat: Double, lon: Double): String? {
-        val apiKey = userPreferencesRepository.apiKey.first()
+        val apiKey = userPreferencesRepository.googleApiKey.first()
         if (apiKey.isNullOrEmpty()) {
             Log.e("GoogleGeocodingService", "API key is missing")
             return null

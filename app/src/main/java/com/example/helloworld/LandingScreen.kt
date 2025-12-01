@@ -45,7 +45,7 @@ fun LandingScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onCategorySelected(category) }
-                    .padding(16.dp),
+                    .padding(top = 16.dp, bottom = 16.dp, start = 16.dp, end = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
@@ -59,10 +59,13 @@ fun LandingScreen(
                     contentDescription = null
                 )
             }
-            HorizontalDividerMMD(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                thickness = 1.dp
-            )
+
+            if (category != poiCategories.last()) {
+                HorizontalDividerMMD(
+                    modifier = Modifier.padding(start = 16.dp),
+                    thickness = 1.dp
+                )
+            }
         }
     }
 }

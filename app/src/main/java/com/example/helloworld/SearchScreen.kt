@@ -66,10 +66,13 @@ fun SearchScreen(
                     contentDescription = null
                 )
             }
-            HorizontalDividerMMD(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                thickness = 1.dp
-            )
+
+            if (poi != searchResults.last()) {
+                HorizontalDividerMMD(
+                    modifier = Modifier.padding(start = 16.dp),
+                    thickness = 1.dp
+                )
+            }
         }
     }
 }
