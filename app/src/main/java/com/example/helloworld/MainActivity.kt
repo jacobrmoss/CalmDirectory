@@ -96,7 +96,17 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(paddingValues),
                     ) {
                         composable("main") { MainScreen(navController, searchViewModel = searchViewModel) }
-                        composable("settings") { SettingsScreen(navController, searchViewModel = searchViewModel) }
+                        composable("settings") {
+                            val scrollToLocationSettings =
+                                navController.previousBackStackEntry?.savedStateHandle?.get<Boolean>(
+                                    "scrollToLocationSettings"
+                                ) == true
+                            SettingsScreen(
+                                navController = navController,
+                                searchViewModel = searchViewModel,
+                                scrollToLocationSettings = scrollToLocationSettings
+                            )
+                        }
                         composable("geoapify_category") {
                             GeoapifyCategoryScreen { categoryKey ->
                                 searchViewModel.resetSearch()

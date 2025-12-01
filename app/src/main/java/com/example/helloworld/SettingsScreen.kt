@@ -1,18 +1,18 @@
 package com.example.helloworld
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,7 +21,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,7 +34,6 @@ import androidx.navigation.NavController
 import com.example.helloworld.data.MapApp
 import com.example.helloworld.data.SearchProvider
 import com.example.helloworld.data.UserPreferencesRepository
-import com.mudita.mmd.components.bottom_sheet.ModalBottomSheetMMD
 import com.mudita.mmd.components.bottom_sheet.rememberModalBottomSheetMMDState
 import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
@@ -48,12 +46,13 @@ import com.mudita.mmd.components.slider.SliderMMD
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SettingsScreen(
     navController: NavController,
     viewModel: SettingsViewModel = viewModel(),
-    searchViewModel: SearchViewModel = viewModel()
+    searchViewModel: SearchViewModel = viewModel(),
+    scrollToLocationSettings: Boolean = false
 ) {
     val context = LocalContext.current
     val userPreferencesRepository = remember { UserPreferencesRepository(context) }
@@ -75,9 +74,17 @@ fun SettingsScreen(
     val mapApp by userPreferencesRepository.mapApp.collectAsState(initial = MapApp.DEFAULT)
     var searchProvider by remember { mutableStateOf<SearchProvider?>(null) }
     val bottomSheetState = rememberModalBottomSheetMMDState()
+    val locationSettingsBringIntoViewRequester = remember { BringIntoViewRequester() }
 
     LaunchedEffect(Unit) {
         searchProvider = userPreferencesRepository.searchProvider.first()
+    }
+
+    LaunchedEffect(scrollToLocationSettings) {
+        if (scrollToLocationSettings) {
+            locationSettingsBringIntoViewRequester.bringIntoView()
+            navController.previousBackStackEntry?.savedStateHandle?.set("scrollToLocationSettings", false)
+        }
     }
 
     val searchRadius by userPreferencesRepository.searchRadius.collectAsState(initial = 10)
@@ -273,6 +280,7 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
+                        .bringIntoViewRequester(locationSettingsBringIntoViewRequester)
                 ) {
                     if (isEditingLocation) {
                         TextFieldMMD(
