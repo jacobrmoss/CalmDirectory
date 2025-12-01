@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,6 +26,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -37,10 +40,12 @@ import com.mudita.mmd.components.bottom_sheet.rememberModalBottomSheetMMDState
 import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import com.mudita.mmd.components.lazy.LazyColumnMMD
+import com.mudita.mmd.components.radio_button.RadioButtonMMD
 import com.mudita.mmd.components.snackbar.SnackbarHostStateMMD
 import com.mudita.mmd.components.switcher.SwitchMMD
 import com.mudita.mmd.components.text_field.TextFieldMMD
 import com.mudita.mmd.components.slider.SliderMMD
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,9 +73,12 @@ fun SettingsScreen(
     }
     val locationSuggestions by viewModel.locationSuggestions.collectAsState()
     val mapApp by userPreferencesRepository.mapApp.collectAsState(initial = MapApp.DEFAULT)
-    val searchProvider by userPreferencesRepository.searchProvider.collectAsState(initial = SearchProvider.GEOAPIFY)
-    var openBottomSheet by rememberSaveable { mutableStateOf(false) }
+    var searchProvider by remember { mutableStateOf<SearchProvider?>(null) }
     val bottomSheetState = rememberModalBottomSheetMMDState()
+
+    LaunchedEffect(Unit) {
+        searchProvider = userPreferencesRepository.searchProvider.first()
+    }
 
     val searchRadius by userPreferencesRepository.searchRadius.collectAsState(initial = 10)
     var sliderValue by remember(searchRadius) { mutableStateOf(searchRadius.toFloat()) }
@@ -83,46 +91,6 @@ fun SettingsScreen(
         return "x".repeat(key.length - 4) + key.takeLast(4)
     }
 
-    if (openBottomSheet) {
-        ModalBottomSheetMMD(
-            onDismissRequest = { openBottomSheet = false },
-            sheetState = bottomSheetState,
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(text = "Select Map App", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.padding(8.dp))
-                MapApp.values().forEach { app ->
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                text = app.name
-                                    .replace("_", " ")
-                                    .lowercase()
-                                    .replaceFirstChar { it.uppercase() }
-                            )
-                        },
-                        leadingContent = {
-                            RadioButton(
-                                selected = mapApp == app,
-                                onClick = null
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            coroutineScope.launch {
-                                userPreferencesRepository.saveMapApp(app)
-                                bottomSheetState.hide()
-                            }.invokeOnCompletion {
-                                if (!bottomSheetState.isVisible) {
-                                    openBottomSheet = false
-                                }
-                            }
-                        }
-                    )
-                }
-            }
-        }
-    }
-
     LazyColumnMMD(modifier = Modifier.fillMaxSize().padding(vertical = 16.dp)) {
         item {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -133,32 +101,43 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                ) {
-                    RadioButton(
-                        selected = searchProvider == SearchProvider.GOOGLE_PLACES,
-                        onClick = {
+                        .clickable {
+                            searchProvider = SearchProvider.GOOGLE_PLACES
                             coroutineScope.launch {
                                 userPreferencesRepository.saveSearchProvider(SearchProvider.GOOGLE_PLACES)
                                 snackbarHostState.showSnackbar("Using Google Places backend")
                             }
                         }
+                ) {
+                    RadioButtonMMD(
+                        selected = searchProvider == SearchProvider.GOOGLE_PLACES,
+                        onClick = null,
+                        modifier = Modifier.semantics{ contentDescription = "Google Places" }
                     )
-                    Text(text = "Google Places", modifier = Modifier.padding(start = 8.dp))
+
+                    Text(
+                        text = "Google Places",
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
                 }
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                ) {
-                    RadioButton(
-                        selected = searchProvider == SearchProvider.GEOAPIFY,
-                        onClick = {
+                        .padding(top = 8.dp)
+                        .clickable {
+                            searchProvider = SearchProvider.GEOAPIFY
                             coroutineScope.launch {
                                 userPreferencesRepository.saveSearchProvider(SearchProvider.GEOAPIFY)
                                 snackbarHostState.showSnackbar("Using Geoapify backend")
                             }
                         }
+                ) {
+                    RadioButtonMMD(
+                        selected = searchProvider == SearchProvider.GEOAPIFY,
+                        onClick = null,
+                        modifier = Modifier.semantics{ contentDescription = "Geoapify" }
                     )
                     Text(text = "Geoapify", modifier = Modifier.padding(start = 8.dp))
                 }
@@ -167,17 +146,21 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                ) {
-                    RadioButton(
-                        selected = searchProvider == SearchProvider.HERE,
-                        onClick = {
+                        .padding(top = 8.dp)
+                        .clickable {
+                            searchProvider = SearchProvider.HERE
                             coroutineScope.launch {
                                 userPreferencesRepository.saveSearchProvider(SearchProvider.HERE)
                                 snackbarHostState.showSnackbar("Using HERE backend")
                             }
                         }
+                ) {
+                    RadioButtonMMD(
+                        selected = searchProvider == SearchProvider.HERE,
+                        onClick = null,
+                        modifier = Modifier.semantics{ contentDescription = "HERE Maps" }
                     )
-                    Text(text = "HERE", modifier = Modifier.padding(start = 8.dp))
+                    Text(text = "HERE Maps", modifier = Modifier.padding(start = 8.dp))
                 }
 
                 if (searchProvider == SearchProvider.GOOGLE_PLACES) {
@@ -251,7 +234,7 @@ fun SettingsScreen(
                     interactionSource = interactionSource,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp)
+                        .padding(vertical = 8.dp, horizontal = 0.dp)
                 )
             }
         }
@@ -259,15 +242,14 @@ fun SettingsScreen(
         item {
             HorizontalDividerMMD(
                 thickness = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant
+                color = MaterialTheme.colorScheme.outlineVariant,
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
 
         item {
             Spacer(modifier = Modifier.padding(16.dp))
-        }
 
-        item {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text(
                     text = "Use device location",
@@ -371,37 +353,5 @@ fun SettingsScreen(
                 }
             }
         }
-
-
-
-        // THIS MIGHT NOT BE NECESSARY RIGHT NOW BUT LEAVING //
-
-//        item { Spacer(modifier = Modifier.padding(16.dp)) }
-//        item {
-//            HorizontalDividerMMD(
-//                thickness = 1.dp,
-//                color = MaterialTheme.colorScheme.outlineVariant
-//            )
-//        }
-//        item { Spacer(modifier = Modifier.padding(16.dp)) }
-//
-//        item {
-//            Row(
-//                verticalAlignment = Alignment.CenterVertically,
-//                modifier = Modifier.clickable { openBottomSheet = true }) {
-//                Text(
-//                    text = "Map App",
-//                    fontSize = 16.sp,
-//                )
-//                Spacer(modifier = Modifier.weight(1f))
-//                Text(
-//                    text = mapApp.name
-//                        .replace("_", " ")
-//                        .lowercase()
-//                        .replaceFirstChar { it.uppercase() },
-//                    fontSize = 14.sp,
-//                )
-//            }
-//        }
     }
 }

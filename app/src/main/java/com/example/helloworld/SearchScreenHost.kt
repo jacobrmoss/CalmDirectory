@@ -1,6 +1,7 @@
 package com.example.helloworld
 
 import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
@@ -11,6 +12,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
@@ -28,28 +31,33 @@ fun SearchScreenHost(
     val searchQuery by searchViewModel.searchQuery.collectAsState()
     val searchResults by searchViewModel.searchResults.collectAsState()
     val isLoading by searchViewModel.isLoading.collectAsState()
+    val context = LocalContext.current
 
     val requestPermissionLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission()
         ) { isGranted: Boolean ->
             if (isGranted) {
-                // Permission is granted. Re-trigger the search.
-                searchViewModel.onSearchQueryChange(searchQuery)
+                if (searchQuery.isNotBlank()) {
+                    searchViewModel.onSearchQueryChange(searchQuery)
+                }
             } else {
                 // Handle the case where permission is denied.
             }
         }
 
     LaunchedEffect(Unit) {
-        requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasPermission) {
+            requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
     }
 
     LaunchedEffect(query) {
-        // `query` comes from a URL parameter (e.g. "Gas+Stations"). Decode it so that
-        // backend mappings and UI see a human-readable string like "Gas Stations".
-        // We only initialize from it when there isn't an active search yet so that
-        // returning from the details screen keeps the current search.
         val decodedQuery = URLDecoder.decode(query, StandardCharsets.UTF_8.toString())
         val currentQuery = searchQuery
         if (currentQuery.isBlank()) {
@@ -58,8 +66,6 @@ fun SearchScreenHost(
     }
 
     LaunchedEffect(geoCategory) {
-        // geoCategory is only meaningful when using the Geoapify backend. It scopes
-        // free-text searches to a chosen top-level Geoapify category.
         val decodedCategory = URLDecoder.decode(geoCategory, StandardCharsets.UTF_8.toString())
         searchViewModel.setGeoapifyTopLevelCategory(decodedCategory)
     }
@@ -84,8 +90,6 @@ fun SearchScreenHost(
                 val encodedAddress = URLEncoder
                     .encode(addressString, StandardCharsets.UTF_8.toString())
                     .replace("/", "%2F")
-                // Use a non-empty sentinel ("NA") when phone is missing so that
-                // the details route path segments always match the navigation pattern.
                 val rawPhone = poi.phone?.takeIf { it.isNotBlank() } ?: "NA"
                 val encodedPhone = URLEncoder
                     .encode(rawPhone, StandardCharsets.UTF_8.toString())
