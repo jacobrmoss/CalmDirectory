@@ -56,12 +56,14 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.helloworld.data.MapApp
+import com.example.helloworld.data.SearchProvider
 import com.example.helloworld.data.UserPreferencesRepository
 import com.example.helloworld.ui.theme.CalmDirectoryTheme
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import com.mudita.mmd.components.search_bar.SearchBarDefaultsMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
 import java.net.URLDecoder
+import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,10 +95,27 @@ class MainActivity : ComponentActivity() {
                         startDestination = "main",
                         modifier = Modifier.padding(paddingValues),
                     ) {
-                        composable("main") { MainScreen(navController) }
-                        composable("settings") { SettingsScreen(navController, searchViewModel = searchViewModel) }
+                        composable("main") { MainScreen(navController, searchViewModel = searchViewModel) }
+                        composable("settings") {
+                            val scrollToLocationSettings =
+                                navController.previousBackStackEntry?.savedStateHandle?.get<Boolean>(
+                                    "scrollToLocationSettings"
+                                ) == true
+                            SettingsScreen(
+                                navController = navController,
+                                searchViewModel = searchViewModel,
+                                scrollToLocationSettings = scrollToLocationSettings
+                            )
+                        }
+                        composable("geoapify_category") {
+                            GeoapifyCategoryScreen { categoryKey ->
+                                searchViewModel.resetSearch()
+                                val encoded = URLEncoder.encode(categoryKey, StandardCharsets.UTF_8.toString())
+                                navController.navigate("search?autoFocus=true&geoCategory=$encoded")
+                            }
+                        }
                         composable(
-                            "search?query={query}&autoFocus={autoFocus}",
+                            "search?query={query}&autoFocus={autoFocus}&geoCategory={geoCategory}",
                             arguments = listOf(
                                 navArgument("query") {
                                     defaultValue = ""
@@ -105,12 +124,17 @@ class MainActivity : ComponentActivity() {
                                 navArgument("autoFocus") {
                                     defaultValue = false
                                     type = NavType.BoolType
+                                },
+                                navArgument("geoCategory") {
+                                    defaultValue = ""
+                                    type = NavType.StringType
                                 }
                             )
                         ) { backStackEntry ->
                             val query = backStackEntry.arguments?.getString("query") ?: ""
                             val autoFocus =
                                 backStackEntry.arguments?.getBoolean("autoFocus") ?: false
+                            val geoCategory = backStackEntry.arguments?.getString("geoCategory") ?: ""
                             var wasFocused by rememberSaveable { mutableStateOf(false) }
 
                             LaunchedEffect(autoFocus, wasFocused) {
@@ -122,11 +146,12 @@ class MainActivity : ComponentActivity() {
                             SearchScreenHost(
                                 navController = navController,
                                 query = query,
+                                geoCategory = geoCategory,
                                 searchViewModel = searchViewModel
                             )
                         }
                         composable(
-                            "details/{poiName}/{poiAddress}/{poiPhone}/{poiDescription}/{poiHours}?poiWebsite={poiWebsite}&lat={lat}&lng={lng}",
+                            "details/{poiName}/{poiAddress}/{poiPhone}/{poiDescription}/{poiHours}?poiWebsite={poiWebsite}&lat={lat}&lng={lng}&geoPlaceId={geoPlaceId}",
                             arguments = listOf(
                                 navArgument("poiWebsite") {
                                     type = NavType.StringType
@@ -137,6 +162,10 @@ class MainActivity : ComponentActivity() {
                                 },
                                 navArgument("lng") {
                                     type = NavType.FloatType
+                                },
+                                navArgument("geoPlaceId") {
+                                    type = NavType.StringType
+                                    defaultValue = ""
                                 }
                             )
                         ) { backStackEntry ->
@@ -149,10 +178,12 @@ class MainActivity : ComponentActivity() {
                                     ?.replace("%2F", "/"),
                                 StandardCharsets.UTF_8.toString()
                             )
-                            val poiPhone = URLDecoder.decode(
-                                backStackEntry.arguments?.getString("poiPhone")?.replace("%2F", "/"),
-                                StandardCharsets.UTF_8.toString()
-                            )
+                            val rawPoiPhone = backStackEntry.arguments?.getString("poiPhone")
+                                ?.replace("%2F", "/")
+                                ?.let { URLDecoder.decode(it, StandardCharsets.UTF_8.toString()) }
+                                ?: ""
+                            val poiPhone =
+                                if (rawPoiPhone == "NA" || rawPoiPhone == "N/A") "" else rawPoiPhone
                             val poiDescription = URLDecoder.decode(
                                 backStackEntry.arguments?.getString("poiDescription")
                                     ?.replace("%2F", "/"),
@@ -162,10 +193,16 @@ class MainActivity : ComponentActivity() {
                                 backStackEntry.arguments?.getString("poiHours")?.replace("%2F", "/"),
                                 StandardCharsets.UTF_8.toString()
                             )
+                            val geoPlaceId = backStackEntry.arguments?.getString("geoPlaceId")
+                                ?.takeIf { it.isNotBlank() }
+                                ?.replace("%2F", "/")
+                                ?.let { URLDecoder.decode(it, StandardCharsets.UTF_8.toString()) }
                             val poiHours =
-                                if (poiHoursString == "N/A") emptyList() else poiHoursString.split(
-                                    ","
-                                )
+                                if (poiHoursString == "NA" || poiHoursString == "N/A") {
+                                    emptyList()
+                                } else {
+                                    poiHoursString.split(",")
+                                }
                             val poiLat: Double? = backStackEntry.arguments?.getFloat("lat")?.toDouble()
                             val poiLng: Double? = backStackEntry.arguments?.getFloat("lng")?.toDouble()
                             val poiWebsite = backStackEntry.arguments?.getString("poiWebsite")
@@ -178,6 +215,7 @@ class MainActivity : ComponentActivity() {
                                 poiWebsite = poiWebsite,
                                 poiLat = poiLat,
                                 poiLng = poiLng,
+                                geoPlaceId = geoPlaceId,
                                 navController = navController
                             )
                         }
@@ -201,6 +239,7 @@ fun DirectoryTopAppBar(
     val searchQuery by searchViewModel.searchQuery.collectAsState()
     val userPreferencesRepository = remember { UserPreferencesRepository(context) }
     val mapApp by userPreferencesRepository.mapApp.collectAsState(initial = MapApp.DEFAULT)
+    val searchProvider by userPreferencesRepository.searchProvider.collectAsState(initial = SearchProvider.HERE)
 
     Column {
         TopAppBarMMD(
@@ -208,7 +247,8 @@ fun DirectoryTopAppBar(
                 when (navBackStackEntry?.destination?.route) {
                     "main" -> Text("Directory", fontWeight = FontWeight.Bold)
                     "settings" -> Text("Settings", fontWeight = FontWeight.Bold)
-                    "search?query={query}&autoFocus={autoFocus}" -> {
+                    "geoapify_category" -> Text("Select a Category", fontWeight = FontWeight.Bold)
+                    "search?query={query}&autoFocus={autoFocus}&geoCategory={geoCategory}" -> {
                         CompositionLocalProvider(
                             LocalTextStyle provides TextStyle(
                                 fontSize = 22.sp,
@@ -240,7 +280,7 @@ fun DirectoryTopAppBar(
                             )
                         }
                     }
-                    "details/{poiName}/{poiAddress}/{poiPhone}/{poiDescription}/{poiHours}?poiWebsite={poiWebsite}&lat={lat}&lng={lng}" -> {
+                    "details/{poiName}/{poiAddress}/{poiPhone}/{poiDescription}/{poiHours}?poiWebsite={poiWebsite}&lat={lat}&lng={lng}&geoPlaceId={geoPlaceId}" -> {
                         val poiName = navBackStackEntry.arguments?.getString("poiName")
                         Text(
                             text = URLDecoder.decode(poiName, StandardCharsets.UTF_8.toString()),
@@ -254,8 +294,9 @@ fun DirectoryTopAppBar(
             },
             navigationIcon = {
                 when (navBackStackEntry?.destination?.route) {
-                    "settings", "search?query={query}&autoFocus={autoFocus}",
-                    "details/{poiName}/{poiAddress}/{poiPhone}/{poiDescription}/{poiHours}?poiWebsite={poiWebsite}&lat={lat}&lng={lng}" -> {
+                    "geoapify_category",
+                    "settings", "search?query={query}&autoFocus={autoFocus}&geoCategory={geoCategory}",
+                    "details/{poiName}/{poiAddress}/{poiPhone}/{poiDescription}/{poiHours}?poiWebsite={poiWebsite}&lat={lat}&lng={lng}&geoPlaceId={geoPlaceId}" -> {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
@@ -266,7 +307,14 @@ fun DirectoryTopAppBar(
                 when (navBackStackEntry?.destination?.route) {
                     "main" -> {
                         if (!apiKey.isNullOrEmpty()) {
-                            IconButton(onClick = { navController.navigate("search?autoFocus=true") }) {
+                            IconButton(onClick = {
+                                searchViewModel.resetSearch()
+                                if (searchProvider == SearchProvider.GEOAPIFY) {
+                                    navController.navigate("geoapify_category")
+                                } else {
+                                    navController.navigate("search?autoFocus=true")
+                                }
+                            }) {
                                 Icon(Icons.Outlined.Search, contentDescription = "Search")
                             }
                             IconButton(onClick = { navController.navigate("settings") }) {
@@ -275,10 +323,22 @@ fun DirectoryTopAppBar(
                         }
                     }
 
-                    "details/{poiName}/{poiAddress}/{poiPhone}/{poiDescription}/{poiHours}?poiWebsite={poiWebsite}&lat={lat}&lng={lng}" -> {
+                    "details/{poiName}/{poiAddress}/{poiPhone}/{poiDescription}/{poiHours}?poiWebsite={poiWebsite}&lat={lat}&lng={lng}&geoPlaceId={geoPlaceId}" -> {
                         val poiWebsite = navBackStackEntry.arguments?.getString("poiWebsite")
                         val poiAddress = navBackStackEntry.arguments?.getString("poiAddress")
-                        val poiPhone = navBackStackEntry.arguments?.getString("poiPhone")
+                        val rawPoiPhoneFromArgs = navBackStackEntry.arguments?.getString("poiPhone")
+                            ?.replace("%2F", "/")
+                            ?.let { URLDecoder.decode(it, StandardCharsets.UTF_8.toString()) }
+                            ?.takeUnless { it == "NA" || it == "N/A" }
+                            ?: ""
+                        val decodedPoiPhone = if (navBackStackEntry != null) {
+                            val phoneFlow = navBackStackEntry.savedStateHandle
+                                .getStateFlow("effectivePoiPhone", rawPoiPhoneFromArgs)
+                            val phone by phoneFlow.collectAsState()
+                            phone
+                        } else {
+                            rawPoiPhoneFromArgs
+                        }
                         val lat = navBackStackEntry.arguments?.getFloat("lat")
                         val lng = navBackStackEntry.arguments?.getFloat("lng")
                         if (poiWebsite != null) {
@@ -346,15 +406,18 @@ fun DirectoryTopAppBar(
                                 modifier = Modifier.size(28.dp)
                             )
                         }
-                        IconButton(onClick = {
-                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$poiPhone"))
-                            context.startActivity(intent)
-                        }) {
-                            Icon(
-                                Icons.Outlined.Phone,
-                                contentDescription = "Call",
-                                modifier = Modifier.size(28.dp)
-                            )
+                        val hasDialablePhone = decodedPoiPhone.any { it.isDigit() }
+                        if (hasDialablePhone) {
+                            IconButton(onClick = {
+                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$decodedPoiPhone"))
+                                context.startActivity(intent)
+                            }) {
+                                Icon(
+                                    Icons.Outlined.Phone,
+                                    contentDescription = "Call",
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
                         }
                     }
                 }

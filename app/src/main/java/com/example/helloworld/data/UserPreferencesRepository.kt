@@ -16,14 +16,15 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "se
 class UserPreferencesRepository(
     private val context: Context
 ) {
-    val apiKey: Flow<String?> = context.dataStore.data
+    val googleApiKey: Flow<String?> = context.dataStore.data
         .map { preferences ->
             preferences[API_KEY]
         }
 
     val useDeviceLocation: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
-            preferences[USE_DEVICE_LOCATION] ?: true
+            // Default to NOT using device location so onboarding can prompt for a manual location.
+            preferences[USE_DEVICE_LOCATION] ?: false
         }
 
     val defaultLocation: Flow<String?> = context.dataStore.data
@@ -36,12 +37,18 @@ class UserPreferencesRepository(
             MapApp.valueOf(preferences[MAP_APP] ?: MapApp.DEFAULT.name)
         }
 
+    val searchProvider: Flow<SearchProvider> = context.dataStore.data
+        .map { preferences ->
+            // Default to HERE so the app works out of the box with the built-in key.
+            SearchProvider.valueOf(preferences[SEARCH_PROVIDER] ?: SearchProvider.HERE.name)
+        }
+
     val searchRadius: Flow<Int> = context.dataStore.data
         .map { preferences ->
             preferences[SEARCH_RADIUS] ?: 10 // default 10 miles
         }
 
-    suspend fun saveApiKey(apiKey: String) {
+    suspend fun saveGoogleApiKey(apiKey: String) {
         context.dataStore.edit { settings ->
             settings[API_KEY] = apiKey
         }
@@ -71,12 +78,18 @@ class UserPreferencesRepository(
         }
     }
 
+    suspend fun saveSearchProvider(provider: SearchProvider) {
+        context.dataStore.edit { settings ->
+            settings[SEARCH_PROVIDER] = provider.name
+        }
+    }
 
     private companion object {
         val API_KEY = stringPreferencesKey("api_key")
         val USE_DEVICE_LOCATION = booleanPreferencesKey("use_device_location")
         val DEFAULT_LOCATION = stringPreferencesKey("default_location")
         val MAP_APP = stringPreferencesKey("map_app")
+        val SEARCH_PROVIDER = stringPreferencesKey("search_provider")
         val SEARCH_RADIUS = intPreferencesKey("search_radius") // in miles
 
     }

@@ -1,6 +1,7 @@
 package com.example.helloworld
 
 import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
@@ -11,40 +12,62 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
 import java.net.URLEncoder
+import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
 @Composable
 fun SearchScreenHost(
     navController: NavController,
     query: String,
+    geoCategory: String,
     searchViewModel: SearchViewModel = viewModel()
 ) {
     val searchQuery by searchViewModel.searchQuery.collectAsState()
     val searchResults by searchViewModel.searchResults.collectAsState()
     val isLoading by searchViewModel.isLoading.collectAsState()
+    val context = LocalContext.current
 
     val requestPermissionLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission()
         ) { isGranted: Boolean ->
             if (isGranted) {
-                // Permission is granted. Re-trigger the search.
-                searchViewModel.onSearchQueryChange(searchQuery)
+                if (searchQuery.isNotBlank()) {
+                    searchViewModel.onSearchQueryChange(searchQuery)
+                }
             } else {
                 // Handle the case where permission is denied.
             }
         }
 
     LaunchedEffect(Unit) {
-        requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasPermission) {
+            requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
     }
 
     LaunchedEffect(query) {
-        searchViewModel.onSearchQueryChange(query)
+        val decodedQuery = URLDecoder.decode(query, StandardCharsets.UTF_8.toString())
+        val currentQuery = searchQuery
+        if (currentQuery.isBlank()) {
+            searchViewModel.onSearchQueryChange(decodedQuery)
+        }
+    }
+
+    LaunchedEffect(geoCategory) {
+        val decodedCategory = URLDecoder.decode(geoCategory, StandardCharsets.UTF_8.toString())
+        searchViewModel.setGeoapifyTopLevelCategory(decodedCategory)
     }
 
     if (isLoading) {
@@ -67,8 +90,9 @@ fun SearchScreenHost(
                 val encodedAddress = URLEncoder
                     .encode(addressString, StandardCharsets.UTF_8.toString())
                     .replace("/", "%2F")
+                val rawPhone = poi.phone?.takeIf { it.isNotBlank() } ?: "NA"
                 val encodedPhone = URLEncoder
-                    .encode(poi.phone ?: "NA", StandardCharsets.UTF_8.toString())
+                    .encode(rawPhone, StandardCharsets.UTF_8.toString())
                     .replace("/", "%2F")
                 val encodedDescription = URLEncoder
                     .encode(poi.description ?: "NA", StandardCharsets.UTF_8.toString())
@@ -87,8 +111,13 @@ fun SearchScreenHost(
                     route += "?poiWebsite=$encodedWebsite"
                 }
                 if (poi.lat != null && poi.lng != null) {
-                    route += if (poi.website != null) "&" else "?"
+                    route += if (route.contains("?")) "&" else "?"
                     route += "lat=${poi.lat}&lng=${poi.lng}"
+                }
+                if (!poi.geoapifyPlaceId.isNullOrBlank()) {
+                    val encodedGeoId = URLEncoder.encode(poi.geoapifyPlaceId, StandardCharsets.UTF_8.toString())
+                    route += if (route.contains("?")) "&" else "?"
+                    route += "geoPlaceId=$encodedGeoId"
                 }
                 navController.navigate(route)
             }

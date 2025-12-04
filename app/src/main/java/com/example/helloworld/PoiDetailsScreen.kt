@@ -13,6 +13,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -22,12 +28,13 @@ import java.util.Locale
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.util.Log
 import androidx.compose.ui.platform.LocalContext
+import com.example.helloworld.GeoapifyPlacesApiService
+import com.example.helloworld.data.UserPreferencesRepository
 import com.mudita.mmd.components.snackbar.SnackbarHostMMD
 import com.mudita.mmd.components.snackbar.SnackbarHostStateMMD
 import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
@@ -45,11 +52,42 @@ fun PoiDetailsScreen(
     poiWebsite: String?,
     poiLat: Double?,
     poiLng: Double?,
+    geoPlaceId: String?,
     navController: NavController
 ) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostStateMMD() }
     val scope = rememberCoroutineScope()
+
+    // Local state that can be enriched with Geoapify place details when available.
+    var phone by remember { mutableStateOf(poiPhone) }
+    var hours by remember { mutableStateOf(poiHours) }
+
+    LaunchedEffect(geoPlaceId) {
+        if (!geoPlaceId.isNullOrBlank()) {
+            try {
+                val repo = UserPreferencesRepository(context)
+                val service = GeoapifyPlacesApiService(repo)
+                val details = service.getPlaceDetails(geoPlaceId)
+                if (details != null) {
+                    if (!details.phone.isNullOrBlank()) {
+                        phone = details.phone
+                    }
+                    if (details.hours.isNotEmpty()) {
+                        hours = details.hours
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("PoiDetailsScreen", "Failed to load Geoapify place details", e)
+            }
+        }
+    }
+
+    val currentBackStackEntry = navController.currentBackStackEntry
+
+    LaunchedEffect(phone) {
+        currentBackStackEntry?.savedStateHandle?.set("effectivePoiPhone", phone)
+    }
 
     Scaffold(
         snackbarHost = {
@@ -112,14 +150,14 @@ fun PoiDetailsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Text(text = formatPhoneNumber(poiPhone))
+            Text(text = formatPhoneNumber(phone))
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            poiHours.forEach { hour ->
+            hours.forEach { hour ->
                 Text(text = formatHours(hour))
 
-                if (hour != poiHours.last()) {
+                if (hour != hours.last()) {
                     Spacer(modifier = Modifier.height(5.dp))
                 }
             }
@@ -143,8 +181,21 @@ fun formatCoordinates(lat: Double?, lng: Double?, precision: Int = 6): String {
 
 fun formatPhoneNumber(phoneNumber: String): String {
     val sanitizedPhoneNumber = phoneNumber.trim()
+    if (sanitizedPhoneNumber.isEmpty()) return ""
+
+    val digitsOnly = sanitizedPhoneNumber.filter { it.isDigit() }
+    // If there aren't enough digits to be a real phone number, just show the raw string
+    if (digitsOnly.length < 10) return sanitizedPhoneNumber
+
+    val normalized = if (digitsOnly.length == 11 && digitsOnly.startsWith("1")) {
+        digitsOnly.drop(1)
+    } else {
+        digitsOnly
+    }
+    if (normalized.length != 10) return sanitizedPhoneNumber
+
     val regex = Regex("""(\d{3})(\d{3})(\d{4})""")
-    return sanitizedPhoneNumber.replace(regex, "($1) $2-$3")
+    return normalized.replace(regex, "($1) $2-$3")
 }
 
 fun formatHour(time: String): String {

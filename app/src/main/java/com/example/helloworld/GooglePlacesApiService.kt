@@ -15,15 +15,20 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 import kotlin.math.cos
 
+interface PlacesBackend {
+    suspend fun search(query: String, lat: Double, lon: Double): List<Poi>
+    suspend fun autocomplete(query: String): List<String>
+}
+
 class GooglePlacesApiService(
     private val context: Context,
     private val userPreferencesRepository: UserPreferencesRepository
-) {
+) : PlacesBackend {
     private var placesClient: PlacesClient? = null
     private var token: AutocompleteSessionToken? = null
 
     private suspend fun initializePlacesClient(context: Context) {
-        val apiKey = userPreferencesRepository.apiKey.first()
+        val apiKey = userPreferencesRepository.googleApiKey.first()
         if (apiKey.isNullOrEmpty()) {
             throw IllegalStateException("API key not found. Please set it in the settings.")
         }
@@ -34,7 +39,7 @@ class GooglePlacesApiService(
         token = AutocompleteSessionToken.newInstance()
     }
 
-    suspend fun search(query: String, lat: Double, lon: Double): List<Poi> {
+    override suspend fun search(query: String, lat: Double, lon: Double): List<Poi> {
         if (placesClient == null) {
             initializePlacesClient(context)
         }
@@ -72,7 +77,7 @@ class GooglePlacesApiService(
                     name = place.name ?: "N/A",
                     address = parseAddress(place.address),
                     hours = place.openingHours?.weekdayText ?: emptyList(),
-                    phone = place.phoneNumber?.let { formatPhoneNumber(it) } ?: "N/A",
+                    phone = place.phoneNumber?.let { formatPhoneNumber(it) },
                     description = place.placeTypes?.joinToString(", ") ?: "N/A",
                     website = place.websiteUri?.toString(),
                     lat = place.latLng?.latitude,
@@ -85,7 +90,7 @@ class GooglePlacesApiService(
         }
     }
 
-    suspend fun getAutocompleteSuggestions(query: String): List<String> {
+    override suspend fun autocomplete(query: String): List<String> {
         if (placesClient == null) {
             initializePlacesClient(context)
         }
