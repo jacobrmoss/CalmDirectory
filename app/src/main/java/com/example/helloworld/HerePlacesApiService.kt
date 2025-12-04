@@ -88,10 +88,9 @@ class HerePlacesApiService(
                     country = addr?.countryName ?: addr?.countryCode ?: ""
                 )
 
-                val isOpen = item.openingHours?.firstOrNull()?.isOpen ?: true
-
-                // Don't return a result if it is not open now and we only are filtering for open now
-                if (openNow && !isOpen) return@mapNotNull null
+                // TODO: add is open filter
+                //val isOpen = item.openingHours?.firstOrNull()?.isOpen ?: true
+                //if (openNow && !isOpen) return@mapNotNull null
 
                 val hoursList = item.openingHours
                     ?.flatMap { it.text.orEmpty() }

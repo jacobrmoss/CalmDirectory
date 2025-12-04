@@ -268,7 +268,7 @@ fun SettingsScreen(
                 Row(
                     verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Open now",
+                        text = "Open now (Google only)",
                         fontSize = 16.sp,
                     )
                     Spacer(modifier = Modifier.weight(1f))
