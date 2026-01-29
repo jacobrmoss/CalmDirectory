@@ -1,9 +1,17 @@
 package com.example.helloworld
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Color as AndroidColor
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,9 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.ui.viewinterop.AndroidView
-import android.view.LayoutInflater
-import android.view.View
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Place
@@ -25,86 +30,90 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import com.calmapps.directory.R
 import com.mapbox.api.directions.v5.models.RouteOptions
+import com.mapbox.bindgen.Expected
 import com.mapbox.bindgen.Value
-import com.mudita.mmd.components.buttons.ButtonMMD
+import com.mapbox.common.location.Location
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.EdgeInsets
 import com.mapbox.maps.MapView
-import com.mapbox.navigation.base.formatter.DistanceFormatterOptions
-import com.mapbox.navigation.core.formatter.MapboxDistanceFormatter
-import com.mapbox.navigation.tripdata.maneuver.api.MapboxManeuverApi
-import com.mapbox.navigation.ui.components.maneuver.view.MapboxManeuverView
 import com.mapbox.maps.MapboxExperimental
 import com.mapbox.maps.extension.compose.MapEffect
 import com.mapbox.maps.extension.compose.MapboxMap
-import com.mapbox.maps.extension.compose.annotation.Marker
-import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
+import com.mapbox.maps.extension.compose.annotation.IconImage
+import com.mapbox.maps.extension.compose.annotation.generated.PointAnnotation
+import com.mapbox.maps.extension.style.layers.properties.generated.IconAnchor
 import com.mapbox.maps.plugin.LocationPuck2D
 import com.mapbox.maps.plugin.animation.camera
 import com.mapbox.maps.plugin.locationcomponent.location
-import com.mapbox.bindgen.Expected
-import com.mapbox.common.location.Location
 import com.mapbox.navigation.base.extensions.applyDefaultNavigationOptions
 import com.mapbox.navigation.base.extensions.applyLanguageAndVoiceUnitOptions
+import com.mapbox.navigation.base.formatter.DistanceFormatterOptions
 import com.mapbox.navigation.base.route.NavigationRoute
 import com.mapbox.navigation.base.route.NavigationRouterCallback
 import com.mapbox.navigation.base.route.RouterFailure
 import com.mapbox.navigation.core.directions.session.RoutesObserver
-import com.mapbox.navigation.core.directions.session.RoutesUpdatedResult
+import com.mapbox.navigation.core.formatter.MapboxDistanceFormatter
 import com.mapbox.navigation.core.lifecycle.MapboxNavigationApp
 import com.mapbox.navigation.core.trip.session.LocationMatcherResult
 import com.mapbox.navigation.core.trip.session.LocationObserver
 import com.mapbox.navigation.core.trip.session.RouteProgressObserver
 import com.mapbox.navigation.core.trip.session.VoiceInstructionsObserver
+import com.mapbox.navigation.tripdata.maneuver.api.MapboxManeuverApi
 import com.mapbox.navigation.ui.base.util.MapboxNavigationConsumer
+import com.mapbox.navigation.ui.components.maneuver.model.ManeuverPrimaryOptions
+import com.mapbox.navigation.ui.components.maneuver.model.ManeuverSecondaryOptions
+import com.mapbox.navigation.ui.components.maneuver.model.ManeuverSubOptions
+import com.mapbox.navigation.ui.components.maneuver.model.ManeuverViewOptions
+import com.mapbox.navigation.ui.components.maneuver.view.MapboxManeuverView
 import com.mapbox.navigation.ui.maps.camera.NavigationCamera
 import com.mapbox.navigation.ui.maps.camera.data.MapboxNavigationViewportDataSource
 import com.mapbox.navigation.ui.maps.location.NavigationLocationProvider
+import com.mapbox.navigation.ui.maps.route.arrow.api.MapboxRouteArrowApi
+import com.mapbox.navigation.ui.maps.route.arrow.api.MapboxRouteArrowView
+import com.mapbox.navigation.ui.maps.route.arrow.model.RouteArrowOptions
 import com.mapbox.navigation.ui.maps.route.line.api.MapboxRouteLineApi
 import com.mapbox.navigation.ui.maps.route.line.api.MapboxRouteLineView
 import com.mapbox.navigation.ui.maps.route.line.model.MapboxRouteLineApiOptions
 import com.mapbox.navigation.ui.maps.route.line.model.MapboxRouteLineViewOptions
 import com.mapbox.navigation.ui.maps.route.line.model.RouteLineColorResources
-import com.mapbox.navigation.ui.maps.route.arrow.api.MapboxRouteArrowApi
-import com.mapbox.navigation.ui.maps.route.arrow.api.MapboxRouteArrowView
-import com.mapbox.navigation.ui.maps.route.arrow.model.RouteArrowOptions
 import com.mapbox.navigation.voice.api.MapboxSpeechApi
-import android.graphics.Color
-import android.util.Log
-import android.view.ViewGroup
-import android.widget.ImageView
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color as ComposeColor
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
-import com.mapbox.navigation.ui.components.maneuver.model.ManeuverPrimaryOptions
-import com.mapbox.navigation.ui.components.maneuver.model.ManeuverSecondaryOptions
-import com.mapbox.navigation.ui.components.maneuver.model.ManeuverSubOptions
-import com.mapbox.navigation.ui.components.maneuver.model.ManeuverViewOptions
 import com.mapbox.navigation.voice.api.MapboxVoiceInstructionsPlayer
 import com.mapbox.navigation.voice.model.SpeechAnnouncement
 import com.mapbox.navigation.voice.model.SpeechError
 import com.mapbox.navigation.voice.model.SpeechValue
+import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
+import kotlinx.coroutines.launch
 import java.util.Locale
+import android.graphics.RectF
+import android.graphics.Path
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material.icons.outlined.Clear
 
-/**
- * Basic navigation screen.
- */
+private enum class ScreenState {
+    POI_OVERVIEW,
+    ROUTE_PREVIEW,
+    NAVIGATING
+}
+
 @OptIn(MapboxExperimental::class)
 @Composable
 fun NavigationScreen(
@@ -115,97 +124,65 @@ fun NavigationScreen(
 ) {
     val context = LocalContext.current
     val mapboxNavigation = MapboxNavigationApp.current()
+    val scope = rememberCoroutineScope()
 
-    val speechApi = remember {
-        MapboxSpeechApi(
-            context,
-            Locale.getDefault().toLanguageTag()
-        )
-    }
-    val voiceInstructionsPlayer = remember {
-        MapboxVoiceInstructionsPlayer(
-            context,
-            Locale.getDefault().toLanguageTag()
-        )
-    }
-
+    var screenState by remember { mutableStateOf(ScreenState.POI_OVERVIEW) }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var originLabel by remember { mutableStateOf("Locating...") }
+    val markerBitmap = rememberMarkerBitmap()
+    val speechApi = remember { MapboxSpeechApi(context, Locale.getDefault().toLanguageTag()) }
+    val voiceInstructionsPlayer = remember { MapboxVoiceInstructionsPlayer(context, Locale.getDefault().toLanguageTag()) }
     val voiceInstructionsPlayerCallback = remember {
-        MapboxNavigationConsumer<SpeechAnnouncement> { announcement ->
-            speechApi.clean(announcement)
-        }
+        MapboxNavigationConsumer<SpeechAnnouncement> { announcement -> speechApi.clean(announcement) }
     }
-
     val speechCallback = remember {
         MapboxNavigationConsumer<Expected<SpeechError, SpeechValue>> { expected ->
             expected.fold(
-                { error ->
-                    voiceInstructionsPlayer.play(error.fallback, voiceInstructionsPlayerCallback)
-                },
-                { value ->
-                    voiceInstructionsPlayer.play(value.announcement, voiceInstructionsPlayerCallback)
-                }
+                { error -> voiceInstructionsPlayer.play(error.fallback, voiceInstructionsPlayerCallback) },
+                { value -> voiceInstructionsPlayer.play(value.announcement, voiceInstructionsPlayerCallback) }
             )
         }
     }
-
     val voiceInstructionsObserver = remember {
-        VoiceInstructionsObserver { voiceInstructions ->
-            speechApi.generate(voiceInstructions, speechCallback)
-        }
+        VoiceInstructionsObserver { voiceInstructions -> speechApi.generate(voiceInstructions, speechCallback) }
     }
 
-    var isLoading by remember { mutableStateOf(true) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var hasRoute by remember { mutableStateOf(false) }
-    var isNavigating by remember { mutableStateOf(false) }
-    var originLabel by remember { mutableStateOf("Locating current position…") }
-
-    val distanceFormatterOptions = remember {
-        DistanceFormatterOptions.Builder(context).build()
-    }
-    val maneuverApi = remember {
-        MapboxManeuverApi(MapboxDistanceFormatter(distanceFormatterOptions))
-    }
+    val distanceFormatterOptions = remember { DistanceFormatterOptions.Builder(context).build() }
+    val maneuverApi = remember { MapboxManeuverApi(MapboxDistanceFormatter(distanceFormatterOptions)) }
     var maneuverView by remember { mutableStateOf<MapboxManeuverView?>(null) }
 
     val routeLineColorResources = remember {
         RouteLineColorResources.Builder()
-            .routeDefaultColor(Color.BLACK)
-            .routeLineTraveledColor(Color.BLACK)
-            .routeLowCongestionColor(Color.BLACK)
-            .routeModerateCongestionColor(Color.BLACK)
-            .routeHeavyCongestionColor(Color.BLACK)
-            .routeSevereCongestionColor(Color.BLACK)
-            .routeUnknownCongestionColor(Color.BLACK)
-            .routeCasingColor(Color.BLACK)
-            .alternativeRouteDefaultColor(Color.DKGRAY)
-            .alternativeRouteCasingColor(Color.DKGRAY)
-            .alternativeRouteLowCongestionColor(Color.DKGRAY)
-            .alternativeRouteModerateCongestionColor(Color.DKGRAY)
-            .alternativeRouteHeavyCongestionColor(Color.DKGRAY)
-            .alternativeRouteSevereCongestionColor(Color.DKGRAY)
-            .alternativeRouteUnknownCongestionColor(Color.DKGRAY)
-            .inActiveRouteLegsColor(Color.DKGRAY)
+            .routeDefaultColor(AndroidColor.BLACK)
+            .routeLineTraveledColor(AndroidColor.BLACK)
+            .routeLowCongestionColor(AndroidColor.BLACK)
+            .routeModerateCongestionColor(AndroidColor.BLACK)
+            .routeHeavyCongestionColor(AndroidColor.BLACK)
+            .routeSevereCongestionColor(AndroidColor.BLACK)
+            .routeUnknownCongestionColor(AndroidColor.BLACK)
+            .routeCasingColor(AndroidColor.BLACK)
+            .alternativeRouteDefaultColor(AndroidColor.DKGRAY)
+            .alternativeRouteCasingColor(AndroidColor.DKGRAY)
+            .alternativeRouteLowCongestionColor(AndroidColor.DKGRAY)
+            .alternativeRouteModerateCongestionColor(AndroidColor.DKGRAY)
+            .alternativeRouteHeavyCongestionColor(AndroidColor.DKGRAY)
+            .alternativeRouteSevereCongestionColor(AndroidColor.DKGRAY)
+            .alternativeRouteUnknownCongestionColor(AndroidColor.DKGRAY)
+            .inActiveRouteLegsColor(AndroidColor.DKGRAY)
             .build()
     }
+    val routeLineApi = remember { MapboxRouteLineApi(MapboxRouteLineApiOptions.Builder().build()) }
 
-    val routeLineApi = remember {
-        MapboxRouteLineApi(MapboxRouteLineApiOptions.Builder().build())
-    }
     val routeLineView = remember {
         MapboxRouteLineView(
-            MapboxRouteLineViewOptions
-                .Builder(context)
+            MapboxRouteLineViewOptions.Builder(context)
                 .routeLineColorResources(routeLineColorResources)
                 .build()
         )
     }
-
     val routeArrowApi = remember { MapboxRouteArrowApi() }
-    val routeArrowView = remember {
-        val arrowOptions = RouteArrowOptions.Builder(context).build()
-        MapboxRouteArrowView(arrowOptions)
-    }
+    val routeArrowView = remember { MapboxRouteArrowView(RouteArrowOptions.Builder(context).build()) }
 
     val navigationLocationProvider = remember { NavigationLocationProvider() }
     var mapView by remember { mutableStateOf<MapView?>(null) }
@@ -213,117 +190,74 @@ fun NavigationScreen(
     var viewportDataSource by remember { mutableStateOf<MapboxNavigationViewportDataSource?>(null) }
     var isStyleLoaded by remember { mutableStateOf(false) }
 
-    LaunchedEffect(mapboxNavigation) {
-        try {
+    fun fetchRoute() {
+        if (mapboxNavigation == null) return
+
+        scope.launch {
             isLoading = true
             errorMessage = null
 
-            if (mapboxNavigation == null) {
-                errorMessage = "Navigation engine is not initialized."
-                isLoading = false
-                return@LaunchedEffect
-            }
-
-            val locationService = LocationService(context)
-            val bestLocation = locationService.getBestLocationOrNull()
-            val originPoint = if (bestLocation != null) {
-                originLabel = "Current location"
-                Point.fromLngLat(bestLocation.longitude, bestLocation.latitude)
-            } else {
-                originLabel = "Location unavailable (using destination as start)"
-                Point.fromLngLat(poiLng, poiLat)
-            }
-
-            val destinationPoint = Point.fromLngLat(poiLng, poiLat)
-
-            val routeOptions = RouteOptions.builder()
-                .applyDefaultNavigationOptions()
-                .applyLanguageAndVoiceUnitOptions(context)
-                .coordinatesList(listOf(originPoint, destinationPoint))
-                .build()
-
-            mapboxNavigation.requestRoutes(
-                routeOptions,
-                object : NavigationRouterCallback {
-                    override fun onRoutesReady(
-                        routes: List<NavigationRoute>,
-                        routerOrigin: String
-                    ) {
-                        if (routes.isNotEmpty()) {
-                            mapboxNavigation.setNavigationRoutes(routes)
-                            hasRoute = true
-                        } else {
-                            errorMessage = "No route found to destination."
-                        }
-                        isLoading = false
-                    }
-
-                    override fun onFailure(
-                        reasons: List<RouterFailure>,
-                        routeOptions: RouteOptions
-                    ) {
-                        errorMessage = "Failed to fetch route."
-                        isLoading = false
-                    }
-
-                    override fun onCanceled(
-                        routeOptions: RouteOptions,
-                        routerOrigin: String
-                    ) {
-                        errorMessage = "Route request was canceled."
-                        isLoading = false
-                    }
+            try {
+                val locationService = LocationService(context)
+                val bestLocation = locationService.getBestLocationOrNull()
+                val originPoint = if (bestLocation != null) {
+                    originLabel = "Current location"
+                    Point.fromLngLat(bestLocation.longitude, bestLocation.latitude)
+                } else {
+                    originLabel = "Location unavailable"
+                    null
                 }
-            )
-        } catch (_: SecurityException) {
-            errorMessage = "Location permission not granted. Enable location or set a default location in Settings."
-            originLabel = "Location permission not granted"
-            isLoading = false
-        } catch (e: Exception) {
-            errorMessage = "Failed to resolve origin location."
-            originLabel = "Location unavailable"
-            isLoading = false
+
+                if (originPoint == null) {
+                    errorMessage = "Could not determine location."
+                    isLoading = false
+                    return@launch
+                }
+
+                val destinationPoint = Point.fromLngLat(poiLng, poiLat)
+
+                val routeOptions = RouteOptions.builder()
+                    .applyDefaultNavigationOptions()
+                    .applyLanguageAndVoiceUnitOptions(context)
+                    .coordinatesList(listOf(originPoint, destinationPoint))
+                    .build()
+
+                mapboxNavigation.requestRoutes(
+                    routeOptions,
+                    object : NavigationRouterCallback {
+                        override fun onRoutesReady(routes: List<NavigationRoute>, routerOrigin: String) {
+                            if (routes.isNotEmpty()) {
+                                mapboxNavigation.setNavigationRoutes(routes)
+                            } else {
+                                errorMessage = "No route found."
+                            }
+                            isLoading = false
+                        }
+                        override fun onFailure(reasons: List<RouterFailure>, routeOptions: RouteOptions) {
+                            errorMessage = "Failed to fetch route."
+                            isLoading = false
+                        }
+                        override fun onCanceled(routeOptions: RouteOptions, routerOrigin: String) {
+                            isLoading = false
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                errorMessage = "Error finding location: ${e.message}"
+                isLoading = false
+            }
         }
     }
 
-    LaunchedEffect(isStyleLoaded, hasRoute, isNavigating, navigationCamera, viewportDataSource, mapView) {
-        val camera = navigationCamera
-        val viewport = viewportDataSource
-        val map = mapView
-        if (isStyleLoaded && hasRoute && !isNavigating && camera != null && viewport != null && map != null) {
-            val mapboxNav = MapboxNavigationApp.current()
-            if (mapboxNav != null) {
-                val routes = mapboxNav.getNavigationRoutes()
-                if (routes.isNotEmpty()) {
-                    viewport.onRouteChanged(routes[0])
-                    viewport.evaluate()
-
-                    val route = routes[0].directionsRoute
-                    val coordinates = route.geometry()?.let { geometry ->
-                        com.mapbox.geojson.LineString.fromPolyline(geometry, 6).coordinates()
-                    }
-
-                    if (coordinates != null && coordinates.isNotEmpty()) {
-                        val pixelDensity = context.resources.displayMetrics.density.toDouble()
-                        val padding = EdgeInsets(
-                            100.0 * pixelDensity,
-                            100.0 * pixelDensity,
-                            100.0 * pixelDensity,
-                            100.0 * pixelDensity
-                        )
-
-                        val cameraOptions = map.getMapboxMap().cameraForCoordinates(coordinates, padding)
-
-                        map.camera.easeTo(
-                            cameraOptions,
-                            com.mapbox.maps.plugin.animation.MapAnimationOptions.mapAnimationOptions {
-                                duration(1500)
-                            }
-                        )
-                        Log.d("NavigationScreen", "Animating camera to fit route geometry")
-                    }
-                }
-            }
+    fun resetCameraToPoi() {
+        mapView?.let { view ->
+            view.getMapboxMap().setCamera(
+                CameraOptions.Builder()
+                    .center(Point.fromLngLat(poiLng, poiLat))
+                    .zoom(15.0)
+                    .padding(EdgeInsets(0.0, 0.0, 0.0, 0.0))
+                    .build()
+            )
         }
     }
 
@@ -333,42 +267,30 @@ fun NavigationScreen(
 
             if (viewportDataSource == null || navigationCamera == null) {
                 viewportDataSource = MapboxNavigationViewportDataSource(mapboxMap).apply {
-                    val pixelDensity = context.resources.displayMetrics.density.toDouble()
-
-                    followingPadding = EdgeInsets(
-                        120.0 * pixelDensity,
-                        40.0 * pixelDensity,
-                        120.0 * pixelDensity,
-                        40.0 * pixelDensity
-                    )
-
-                    overviewPadding = EdgeInsets(
-                        200.0 * pixelDensity,
-                        60.0 * pixelDensity,
-                        200.0 * pixelDensity,
-                        60.0 * pixelDensity
-                    )
+                    val density = context.resources.displayMetrics.density.toDouble()
+                    followingPadding = EdgeInsets(120.0 * density, 40.0 * density, 120.0 * density, 40.0 * density)
+                    overviewPadding = EdgeInsets(100.0 * density, 100.0 * density, 100.0 * density, 100.0 * density)
                 }
-                navigationCamera = NavigationCamera(
-                    mapboxMap,
-                    mapView!!.camera,
-                    viewportDataSource!!
-                )
+                mapView?.let { view ->
+                    navigationCamera = NavigationCamera(mapboxMap, view.camera, viewportDataSource!!)
+                }
 
-                mapView!!.location.updateSettings {
+                mapView!!.location.apply {
                     enabled = true
                     locationPuck = LocationPuck2D()
+                    setLocationProvider(navigationLocationProvider)
                 }
-                mapView!!.location.setLocationProvider(navigationLocationProvider)
             }
 
-            val routesObserver = RoutesObserver { result: RoutesUpdatedResult ->
+            val routesObserver = RoutesObserver { result ->
                 speechApi.cancel()
                 voiceInstructionsPlayer.clear()
 
                 routeLineApi.setNavigationRoutes(result.navigationRoutes) { drawData ->
-                    mapView?.getMapboxMap()?.getStyle()?.let { style ->
-                        routeLineView.renderRouteDrawData(style, drawData)
+                    mapView?.getMapboxMap()?.let { map ->
+                        map.getStyle()?.let { style ->
+                            routeLineView.renderRouteDrawData(style, drawData)
+                        }
                     }
                 }
 
@@ -377,28 +299,24 @@ fun NavigationScreen(
                     viewportDataSource?.onRouteChanged(primaryRoute)
                     viewportDataSource?.evaluate()
 
-                    if (!isNavigating) {
+                    if (screenState == ScreenState.POI_OVERVIEW) {
+                        screenState = ScreenState.ROUTE_PREVIEW
+                        navigationCamera?.requestNavigationCameraToOverview()
+
+                    } else if (screenState == ScreenState.ROUTE_PREVIEW) {
                         navigationCamera?.requestNavigationCameraToOverview()
                     }
-                } else {
-                    viewportDataSource?.evaluate()
                 }
             }
 
             val locationObserver = object : LocationObserver {
-                override fun onNewLocationMatcherResult(locationMatcherResult: LocationMatcherResult) {
-                    val enhanced = locationMatcherResult.enhancedLocation
-                    navigationLocationProvider.changePosition(
-                        enhanced,
-                        locationMatcherResult.keyPoints
-                    )
+                override fun onNewLocationMatcherResult(result: LocationMatcherResult) {
+                    val enhanced = result.enhancedLocation
+                    navigationLocationProvider.changePosition(enhanced, result.keyPoints)
                     viewportDataSource?.onLocationChanged(enhanced)
                     viewportDataSource?.evaluate()
                 }
-
-                override fun onNewRawLocation(rawLocation: Location) {
-                    // Not used; NavigationLocationProvider uses matcher result above.
-                }
+                override fun onNewRawLocation(rawLocation: Location) {}
             }
 
             val routeProgressObserver = RouteProgressObserver { routeProgress ->
@@ -411,14 +329,9 @@ fun NavigationScreen(
                 }
 
                 val maneuvers = maneuverApi.getManeuvers(routeProgress)
-                maneuvers.fold(
-                    { /* ignore errors for now */ },
-                    { maneuverList ->
-                        if (maneuverList.isNotEmpty()) {
-                            maneuverView?.visibility = View.VISIBLE
-                        }
-                    }
-                )
+                maneuvers.fold({}, { list ->
+                    if (list.isNotEmpty()) maneuverView?.visibility = View.VISIBLE
+                })
                 maneuverView?.renderManeuvers(maneuvers)
             }
 
@@ -441,6 +354,9 @@ fun NavigationScreen(
                 mapboxNavigation.unregisterLocationObserver(locationObserver)
                 mapboxNavigation.unregisterRouteProgressObserver(routeProgressObserver)
                 mapboxNavigation.unregisterVoiceInstructionsObserver(voiceInstructionsObserver)
+                mapboxNavigation.setNavigationRoutes(emptyList())
+                routeLineApi.clearRouteLine { }
+
                 speechApi.cancel()
                 voiceInstructionsPlayer.shutdown()
                 routeLineApi.cancel()
@@ -451,271 +367,202 @@ fun NavigationScreen(
         }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+    Column(modifier = Modifier.fillMaxSize()) {
+
+        Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp),
+                    .padding(top = if (screenState == ScreenState.NAVIGATING) 0.dp else 16.dp)
             ) {
-                if (isNavigating) {
+                if (screenState == ScreenState.NAVIGATING) {
                     AndroidView(
                         modifier = Modifier.fillMaxWidth(),
                         factory = { ctx ->
-                            val view = LayoutInflater.from(ctx)
-                                .inflate(R.layout.view_maneuver, null, false) as MapboxManeuverView
-
-                            val whiteColorRes = android.R.color.white
-                            val blackTextStyle = R.style.ManeuverTextAppearance
-
+                            val view = LayoutInflater.from(ctx).inflate(R.layout.view_maneuver, null, false) as MapboxManeuverView
+                            val white = android.R.color.white
+                            val blackStyle = R.style.ManeuverTextAppearance
                             val options = ManeuverViewOptions.Builder()
-                                .maneuverBackgroundColor(whiteColorRes)
-                                .subManeuverBackgroundColor(whiteColorRes)
-                                .upcomingManeuverBackgroundColor(whiteColorRes)
-                                .stepDistanceTextAppearance(blackTextStyle)
-                                .primaryManeuverOptions(
-                                    ManeuverPrimaryOptions.Builder()
-                                        .textAppearance(blackTextStyle)
-                                        .build()
-                                )
-                                .secondaryManeuverOptions(
-                                    ManeuverSecondaryOptions.Builder()
-                                        .textAppearance(blackTextStyle)
-                                        .build()
-                                )
-                                .subManeuverOptions(
-                                    ManeuverSubOptions.Builder()
-                                        .textAppearance(blackTextStyle)
-                                        .build()
-                                )
+                                .maneuverBackgroundColor(white)
+                                .subManeuverBackgroundColor(white)
+                                .upcomingManeuverBackgroundColor(white)
+                                .stepDistanceTextAppearance(blackStyle)
+                                .primaryManeuverOptions(ManeuverPrimaryOptions.Builder().textAppearance(blackStyle).build())
+                                .secondaryManeuverOptions(ManeuverSecondaryOptions.Builder().textAppearance(blackStyle).build())
+                                .subManeuverOptions(ManeuverSubOptions.Builder().textAppearance(blackStyle).build())
                                 .build()
-
                             view.updateManeuverViewOptions(options)
-
                             view.post {
-                                fun tintIconsBlack(v: View) {
-                                    if (v is ImageView) {
-                                        v.setColorFilter(Color.BLACK)
-                                    } else if (v is ViewGroup) {
-                                        for (i in 0 until v.childCount) {
-                                            tintIconsBlack(v.getChildAt(i))
-                                        }
-                                    }
+                                fun tintBlack(v: View) {
+                                    if (v is ImageView) v.setColorFilter(AndroidColor.BLACK)
+                                    else if (v is ViewGroup) (0 until v.childCount).forEach { tintBlack(v.getChildAt(it)) }
                                 }
-                                tintIconsBlack(view)
+                                tintBlack(view)
                             }
-
-                            view.visibility = View.INVISIBLE
                             maneuverView = view
                             view
                         }
                     )
-                } else {
-                    IconButton(
-                        onClick = { navController.popBackStack() },
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                } else if (screenState == ScreenState.ROUTE_PREVIEW || isLoading) {
+                    IconButton(onClick = {
+                        when(screenState) {
+                            ScreenState.POI_OVERVIEW -> navController.popBackStack()
+                            ScreenState.ROUTE_PREVIEW -> {
+                                mapboxNavigation?.setNavigationRoutes(emptyList())
+                                routeLineApi.clearRouteLine { }
+                                screenState = ScreenState.POI_OVERVIEW
+                                resetCameraToPoi()
+                            }
+                            ScreenState.NAVIGATING -> {
+                                mapboxNavigation?.stopTripSession()
+                                screenState = ScreenState.ROUTE_PREVIEW
+                                navigationCamera?.requestNavigationCameraToOverview()
+                            }
+                        }
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.RadioButtonUnchecked,
-                                contentDescription = "Origin",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-
-                            VerticalDottedLine(
-                                modifier = Modifier
-                                    .width(2.dp)
-                                    .height(32.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant
-                            )
-
-                            Icon(
-                                imageVector = Icons.Outlined.Place,
-                                contentDescription = "Destination",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
+                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 4.dp)) {
+                            Icon(Icons.Outlined.RadioButtonUnchecked, "Origin", tint = MaterialTheme.colorScheme.onSurface)
+                            VerticalDottedLine(modifier = Modifier.width(2.dp).height(32.dp))
+                            Icon(Icons.Outlined.Place, "Destination", tint = MaterialTheme.colorScheme.onSurface)
                         }
 
                         Spacer(modifier = Modifier.width(12.dp))
 
                         Column(
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 16.dp)
                         ) {
-                            Text(
-                                text = originLabel,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                modifier = Modifier.padding(vertical = 2.dp),
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                            )
-
-                            HorizontalDividerMMD(
-                                thickness = 1.dp,
-                                color = MaterialTheme.colorScheme.outlineVariant,
-                                modifier = Modifier.padding(vertical = 16.dp)
-                            )
-
-                            Text(
-                                text = poiName,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                modifier = Modifier.padding(vertical = 2.dp),
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                            )
+                            Text(originLabel, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            HorizontalDividerMMD(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 16.dp))
+                            Text(poiName, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                         }
                     }
                 }
             }
-        }
 
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
             HorizontalDividerMMD(
                 thickness = 3.dp,
                 color = MaterialTheme.colorScheme.outlineVariant,
-                modifier = Modifier.padding(top = 16.dp)
+                modifier = Modifier
+                    .padding(top = if (screenState == ScreenState.NAVIGATING) 0.dp else 16.dp)
             )
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-        ) {
-            MapboxMap(
-                modifier = Modifier.fillMaxSize()
-            ) {
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            MapboxMap(modifier = Modifier.fillMaxSize()) {
                 MapEffect(Unit) { mapViewInstance ->
                     mapView = mapViewInstance
                     val styleUri = mapViewInstance.context.getString(R.string.mapbox_eink_style_uri)
-                    val mapboxMap = mapViewInstance.getMapboxMap()
-
-                    mapboxMap.setCamera(
-                        CameraOptions.Builder()
-                            .center(Point.fromLngLat(poiLng, poiLat))
-                            .zoom(12.0)
-                            .build()
-                    )
-                    Log.d("NavigationScreen", "MapEffect: Loading style from: $styleUri")
-                    mapboxMap.loadStyleUri(styleUri) { style ->
-                        Log.d("NavigationScreen", "MapEffect: Style loaded successfully")
-                        isStyleLoaded = true
-                        style.styleLayers.forEach { layerInfo ->
-                            when (layerInfo.type) {
-                                "background" -> {
-                                    style.setStyleLayerProperty(
-                                        layerInfo.id,
-                                        "background-color",
-                                        Value.valueOf("#FFFFFF")
-                                    )
-                                }
-
-                                "line" -> {
-                                    if (layerInfo.id.startsWith("road")) {
-                                        val color = when {
-                                            layerInfo.id.contains("motorway") ||
-                                                    layerInfo.id.contains("trunk") -> "#222222"
-
-                                            layerInfo.id.contains("primary") ||
-                                                    layerInfo.id.contains("secondary") -> "#444444"
-
-                                            else -> "#777777"
-                                        }
-                                        style.setStyleLayerProperty(
-                                            layerInfo.id,
-                                            "line-color",
-                                            Value.valueOf(color)
-                                        )
+                    mapViewInstance.getMapboxMap().apply {
+                        setCamera(CameraOptions.Builder().center(Point.fromLngLat(poiLng, poiLat)).zoom(15.0).build())
+                        loadStyleUri(styleUri) { style ->
+                            isStyleLoaded = true
+                            style.styleLayers.forEach { layer ->
+                                when (layer.type) {
+                                    "background" -> style.setStyleLayerProperty(layer.id, "background-color", Value.valueOf("#FFFFFF"))
+                                    "line" -> if (layer.id.startsWith("road")) {
+                                        val color = if (layer.id.contains("motorway") || layer.id.contains("trunk")) "#222222" else "#777777"
+                                        style.setStyleLayerProperty(layer.id, "line-color", Value.valueOf(color))
                                     }
-                                }
-
-                                "symbol" -> {
-                                    if (layerInfo.id.contains("label")) {
-                                        style.setStyleLayerProperty(
-                                            layerInfo.id,
-                                            "text-color",
-                                            Value.valueOf("#000000")
-                                        )
-                                    }
+                                    "symbol" -> if (layer.id.contains("label")) style.setStyleLayerProperty(layer.id, "text-color", Value.valueOf("#000000"))
                                 }
                             }
                         }
                     }
                 }
 
-                Marker(
-                    point = Point.fromLngLat(poiLng, poiLat),
-                    color = androidx.compose.ui.graphics.Color.White,
-                    stroke = androidx.compose.ui.graphics.Color.Black,
-                    innerColor = androidx.compose.ui.graphics.Color.White
-                )
+                if (markerBitmap != null) {
+                    PointAnnotation(
+                        point = Point.fromLngLat(poiLng, poiLat)
+                    ) {
+                        iconImage = IconImage(markerBitmap)
+                        iconAnchor = IconAnchor.BOTTOM
+                        iconSize = 1.0
+                    }
+                }
             }
         }
 
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            tonalElevation = 0.dp,
-            shadowElevation = 0.dp,
-            color = MaterialTheme.colorScheme.surface
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+        if (screenState !== ScreenState.NAVIGATING) {
+            Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+
+                    HorizontalDividerMMD(thickness = 3.dp, color = MaterialTheme.colorScheme.outlineVariant)
+
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        ButtonMMD(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = {
+                                when (screenState) {
+                                    ScreenState.POI_OVERVIEW -> fetchRoute()
+                                    ScreenState.ROUTE_PREVIEW -> {
+                                        mapboxNavigation?.startTripSession()
+                                        screenState = ScreenState.NAVIGATING
+                                        navigationCamera?.requestNavigationCameraToFollowing()
+                                    }
+                                    ScreenState.NAVIGATING -> {
+                                        mapboxNavigation?.stopTripSession()
+                                        screenState = ScreenState.ROUTE_PREVIEW
+                                        navigationCamera?.requestNavigationCameraToOverview()
+                                    }
+                                }
+                            },
+                            enabled = !isLoading && errorMessage == null,
+                            contentPadding = PaddingValues(16.dp),
+                        ) {
+                            Text(
+                                text = when (screenState) {
+                                    ScreenState.POI_OVERVIEW -> "Get Directions"
+                                    ScreenState.ROUTE_PREVIEW -> "Start Navigation"
+                                    ScreenState.NAVIGATING -> "End Navigation"
+                                }
+                            )
+                        }
+
+                        if (errorMessage != null) {
+                            Text(errorMessage!!, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+                        }
+                    }
+                }
+            }
+        } else if (screenState == ScreenState.NAVIGATING) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surface
             ) {
-                HorizontalDividerMMD(
-                    thickness = 3.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
+                HorizontalDividerMMD(thickness = 3.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
                 Column(
-                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(16.dp)
                 ) {
-                    ButtonMMD(
-                        modifier = Modifier.fillMaxWidth(),
+
+                    IconButton(
+                        modifier = Modifier.padding(end = 16.dp),
                         onClick = {
-                            val mapboxNavigation = MapboxNavigationApp.current()
-                            if (mapboxNavigation != null && hasRoute) {
-                                if (!isNavigating) {
-                                    mapboxNavigation.startTripSession()
-                                    isNavigating = true
-                                    navigationCamera?.requestNavigationCameraToFollowing()
-                                } else {
-                                    mapboxNavigation.stopTripSession()
-                                    isNavigating = false
-                                    navController.popBackStack()
-                                }
-                            }
-                        },
-                        enabled = !isLoading && errorMessage == null && hasRoute,
-                        contentPadding = PaddingValues(16.dp),
+                            mapboxNavigation?.stopTripSession()
+                            screenState = ScreenState.ROUTE_PREVIEW
+                            navigationCamera?.requestNavigationCameraToOverview()
+                        }
                     ) {
-                        Text(if (isNavigating) "End navigation" else "Start navigation")
+                        Icon(
+                            Icons.Outlined.Clear,
+                            "End Navigation",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
                     }
 
-                    Spacer(modifier = Modifier.padding(8.dp))
+                    // add route time here
+                    // add route distance here
+                    // add eta here
+
                 }
             }
         }
@@ -743,5 +590,54 @@ private fun VerticalDottedLine(
             )
             y += dotDiameter + spacing
         }
+    }
+}
+
+@Composable
+fun rememberMarkerBitmap(): Bitmap? {
+    val context = LocalContext.current
+    return remember(context) {
+        val width = 64
+        val height = 76
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+
+        // Paints
+        val fillPaint = Paint().apply {
+            isAntiAlias = true
+            style = Paint.Style.FILL
+            color = AndroidColor.WHITE
+        }
+        val strokePaint = Paint().apply {
+            isAntiAlias = true
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+            color = AndroidColor.BLACK
+            strokeJoin = Paint.Join.ROUND
+        }
+        val dotPaint = Paint().apply {
+            isAntiAlias = true
+            style = Paint.Style.FILL
+            color = AndroidColor.BLACK
+        }
+
+        val cx = width / 2f
+        val cy = width / 2f - 4f
+        val radius = 24f
+        val tipY = height - 4f
+
+        val path = Path()
+
+        val rect = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
+        path.arcTo(rect, 150f, 240f)
+        path.lineTo(cx, tipY)
+
+        path.close()
+
+        canvas.drawPath(path, fillPaint)
+        canvas.drawPath(path, strokePaint)
+        canvas.drawCircle(cx, cy, 8f, dotPaint)
+
+        bitmap
     }
 }

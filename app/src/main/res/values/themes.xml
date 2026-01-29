@@ -18,14 +18,7 @@
     </style>
     <style name="MapboxCustomManeuverTurnIconStyle" parent="MapboxStyleTurnIconManeuver">
         <item name="maneuverTurnIconColor">#000000</item>
-
         <item name="android:tint">#000000</item>
-
         <item name="maneuverTurnIconShadowColor">#808080</item>
-    </style>
-    <style name="MapboxCustomManeuverStyle" parent="MapboxStyleManeuverView">
-        <item name="maneuverViewBackgroundColor">#219CDC</item>
-        <item name="subManeuverViewBackgroundColor">#219CDC</item>
-        <item name="upcomingManeuverViewBackgroundColor">#219CDC</item>
     </style>
 </resources>
