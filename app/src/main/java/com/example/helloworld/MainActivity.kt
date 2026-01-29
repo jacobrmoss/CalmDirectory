@@ -1,6 +1,5 @@
 package com.example.helloworld
 
-import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -59,6 +58,7 @@ import com.example.helloworld.data.MapApp
 import com.example.helloworld.data.SearchProvider
 import com.example.helloworld.data.UserPreferencesRepository
 import com.example.helloworld.ui.theme.CalmDirectoryTheme
+import com.mapbox.navigation.core.lifecycle.MapboxNavigationApp
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import com.mudita.mmd.components.search_bar.SearchBarDefaultsMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
@@ -70,6 +70,9 @@ import java.nio.charset.StandardCharsets
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        MapboxNavigationApp.attach(this)
+
         setContent {
             CalmDirectoryTheme {
                 val navController = rememberNavController()
@@ -79,21 +82,32 @@ class MainActivity : ComponentActivity() {
                 val apiKey by mainViewModel.apiKey.collectAsState()
                 val focusRequester = remember { FocusRequester() }
 
+                val currentRoute = navBackStackEntry?.destination?.route
+
+                val isFullScreenMapRoute = currentRoute == "map?poiName={poiName}&lat={lat}&lng={lng}"
+
                 Scaffold(
                     topBar = {
-                        DirectoryTopAppBar(
-                            navController = navController,
-                            navBackStackEntry = navBackStackEntry,
-                            searchViewModel = searchViewModel,
-                            apiKey = apiKey,
-                            focusRequester = focusRequester
-                        )
+                        if (!isFullScreenMapRoute) {
+                            DirectoryTopAppBar(
+                                navController = navController,
+                                navBackStackEntry = navBackStackEntry,
+                                searchViewModel = searchViewModel,
+                                apiKey = apiKey,
+                                focusRequester = focusRequester
+                            )
+                        }
                     }
                 ) { paddingValues ->
+                    val navModifier = if (isFullScreenMapRoute) {
+                        Modifier
+                    } else {
+                        Modifier.padding(paddingValues)
+                    }
                     NavHost(
                         navController = navController,
                         startDestination = "main",
-                        modifier = Modifier.padding(paddingValues),
+                        modifier = navModifier,
                     ) {
                         composable("main") { MainScreen(navController, searchViewModel = searchViewModel) }
                         composable("settings") {
@@ -129,7 +143,7 @@ class MainActivity : ComponentActivity() {
                                 if (autoFocus && !wasFocused) {
                                     focusRequester.requestFocus()
                                     wasFocused = true
-                                 }
+                                }
                             }
                             SearchScreenHost(
                                 navController = navController,
@@ -137,6 +151,42 @@ class MainActivity : ComponentActivity() {
                                 searchViewModel = searchViewModel
                             )
                         }
+
+                        composable(
+                            "map?poiName={poiName}&lat={lat}&lng={lng}",
+                            arguments = listOf(
+                                navArgument("poiName") {
+                                    type = NavType.StringType
+                                    defaultValue = ""
+                                },
+                                navArgument("lat") {
+                                    type = NavType.FloatType
+                                },
+                                navArgument("lng") {
+                                    type = NavType.FloatType
+                                }
+                            )
+                        ) { backStackEntry ->
+                            val encodedName = backStackEntry.arguments?.getString("poiName") ?: ""
+                            val poiName = URLDecoder.decode(
+                                encodedName,
+                                StandardCharsets.UTF_8.toString()
+                            )
+                            val poiLat: Double = backStackEntry.arguments?.getFloat("lat")?.toDouble()
+                                ?: 0.0
+                            val poiLng: Double = backStackEntry.arguments?.getFloat("lng")?.toDouble()
+                                ?: 0.0
+
+                            NavigationScreen(
+                                navController = navController,
+                                poiName = poiName,
+                                poiLat = poiLat,
+                                poiLng = poiLng
+                            )
+                        }
+
+                        // DELETED: The "navigation" route was removed here as it is no longer used.
+
                         composable(
                             "details/{poiName}/{poiAddress}/{poiCountry}/{poiPhone}/{poiDescription}/{poiHours}?poiWebsite={poiWebsite}&lat={lat}&lng={lng}",
                             arguments = listOf(
@@ -347,39 +397,14 @@ fun DirectoryTopAppBar(
                             Toast.makeText(context, "Address copied to clipboard", Toast.LENGTH_SHORT)
                                 .show()
 
-                            val (uri, packageName, webUri) = when (mapApp) {
-                                MapApp.GOOGLE_MAPS -> Triple(
-                                    "google.navigation:q=$lat,$lng",
-                                    "com.google.android.apps.maps",
-                                    "https://maps.google.com/maps?q=$decodedAddress"
+                            if (lat != null && lng != null) {
+                                val encodedName = URLEncoder.encode(
+                                    navBackStackEntry.arguments?.getString("poiName"),
+                                    StandardCharsets.UTF_8.toString()
                                 )
-                                MapApp.TOMTOM -> Triple(
-                                    "geo:0,0?q=$lat,$lng($decodedAddress)",
-                                    "com.tomtom.gplay.navapp",
-                                    "https://mydrive.tomtom.com/en_gb/#mode=search&search=$decodedAddress"
+                                navController.navigate(
+                                    "map?poiName=$encodedName&lat=$lat&lng=$lng"
                                 )
-                                MapApp.HERE_WEGO -> Triple(
-                                    "geo:0,0?q=$lat,$lng($decodedAddress)",
-                                    "com.here.app.maps",
-                                    "https://wego.here.com/search/$decodedAddress"
-                                )
-                                else -> Triple(
-                                    "geo:$lat,$lng?q=$decodedAddress",
-                                    null,
-                                    "https://maps.google.com/maps?q=$decodedAddress"
-                                )
-                            }
-
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uri))
-                            if (packageName != null) {
-                                intent.setPackage(packageName)
-                            }
-
-                            try {
-                                context.startActivity(intent)
-                            } catch (e: ActivityNotFoundException) {
-                                val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse(webUri))
-                                context.startActivity(webIntent)
                             }
                         }) {
                             Icon(

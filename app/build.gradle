@@ -60,6 +60,35 @@ android {
 }
 
 dependencies {
+    // Mapbox Maps SDK v11 (NDK27 variant, no Google Play Services via explicit exclusion)
+    implementation('com.mapbox.maps:android-ndk27:11.18.0') {
+        exclude group: 'com.google.android.gms'
+    }
+    // Mapbox Maps Compose extension (NDK27)
+    implementation('com.mapbox.extension:maps-compose-ndk27:11.18.0') {
+        exclude group: 'com.google.android.gms'
+    }
+    // Mapbox Navigation SDK v3 (NDK27 core)
+    implementation('com.mapbox.navigationcore:android-ndk27:3.18.0') {
+        exclude group: 'com.google.android.gms'
+    }
+    // Mapbox Navigation trip data (maneuvers, trip progress, etc.)
+    implementation('com.mapbox.navigationcore:tripdata-ndk27:3.18.0') {
+        exclude group: 'com.google.android.gms'
+    }
+    // Mapbox Navigation UI Maps (camera, route lines, location puck, etc.)
+    implementation('com.mapbox.navigationcore:ui-maps-ndk27:3.18.0') {
+        exclude group: 'com.google.android.gms'
+    }
+    // Mapbox Navigation UI Components (maneuver view, trip progress, etc.)
+    implementation('com.mapbox.navigationcore:ui-components-ndk27:3.18.0') {
+        exclude group: 'com.google.android.gms'
+    }
+    // Mapbox Navigation Voice (voice instructions, TTS)
+    implementation('com.mapbox.navigationcore:voice-ndk27:3.18.0') {
+        exclude group: 'com.google.android.gms'
+    }
+
     implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.3'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.8.3'
