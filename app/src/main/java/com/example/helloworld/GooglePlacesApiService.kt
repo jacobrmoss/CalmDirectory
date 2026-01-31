@@ -43,7 +43,6 @@ class GooglePlacesApiService(
         if (placesClient == null) {
             initializePlacesClient(context)
         }
-        // Define the fields to return for each place.
         val placeFields = listOf(
             Place.Field.NAME,
             Place.Field.ADDRESS,
@@ -57,7 +56,6 @@ class GooglePlacesApiService(
         val requestBuilder = SearchByTextRequest.builder(query, placeFields)
         val searchRadius = userPreferencesRepository.searchRadius.first()
 
-        // Only add location restriction if a valid location is provided
         if (lat != 0.0 || lon != 0.0) {
             val miles = searchRadius.toDouble()
             val latDegrees = miles / 69.0
@@ -73,17 +71,19 @@ class GooglePlacesApiService(
         return try {
             val response = placesClient!!.searchByText(request).await()
             response.places.map { place ->
+                val placeTypes = place.placeTypes ?: emptyList()
+                val isPlace = placeTypes.any { it == "establishment" || it == "point_of_interest" }
+
                 Poi(
                     name = place.name ?: "N/A",
                     address = parseAddress(place.address),
                     hours = place.openingHours?.weekdayText ?: emptyList(),
-                    // Store raw phone; formatting is handled in the UI layer using
-                    // the POI's country and libphonenumber.
                     phone = place.phoneNumber,
                     description = place.placeTypes?.joinToString(", ") ?: "N/A",
                     website = place.websiteUri?.toString(),
                     lat = place.latLng?.latitude,
-                    lng = place.latLng?.longitude
+                    lng = place.latLng?.longitude,
+                    isPlace = isPlace
                 )
             }
         } catch (e: Exception) {

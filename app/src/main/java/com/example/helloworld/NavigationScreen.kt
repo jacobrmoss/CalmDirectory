@@ -1,14 +1,21 @@
 package com.example.helloworld
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
+import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Color as AndroidColor
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
+import android.media.AudioManager
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -18,9 +25,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.Icon
@@ -44,15 +53,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.graphics.createBitmap
 import androidx.navigation.NavController
 import com.calmapps.directory.R
 import com.mapbox.api.directions.v5.models.RouteOptions
 import com.mapbox.bindgen.Expected
 import com.mapbox.bindgen.Value
+import com.mapbox.common.MapboxOptions
 import com.mapbox.common.location.Location
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.EdgeInsets
+import com.mapbox.maps.ImageHolder
 import com.mapbox.maps.MapView
 import com.mapbox.maps.MapboxExperimental
 import com.mapbox.maps.extension.compose.MapEffect
@@ -61,23 +73,27 @@ import com.mapbox.maps.extension.compose.annotation.IconImage
 import com.mapbox.maps.extension.compose.annotation.generated.PointAnnotation
 import com.mapbox.maps.extension.style.layers.properties.generated.IconAnchor
 import com.mapbox.maps.plugin.LocationPuck2D
+import com.mapbox.maps.plugin.PuckBearing
 import com.mapbox.maps.plugin.animation.camera
 import com.mapbox.maps.plugin.locationcomponent.location
 import com.mapbox.navigation.base.extensions.applyDefaultNavigationOptions
 import com.mapbox.navigation.base.extensions.applyLanguageAndVoiceUnitOptions
 import com.mapbox.navigation.base.formatter.DistanceFormatterOptions
+import com.mapbox.navigation.base.options.NavigationOptions
 import com.mapbox.navigation.base.route.NavigationRoute
 import com.mapbox.navigation.base.route.NavigationRouterCallback
 import com.mapbox.navigation.base.route.RouterFailure
+import com.mapbox.navigation.core.MapboxNavigation
+import com.mapbox.navigation.core.MapboxNavigationProvider
 import com.mapbox.navigation.core.directions.session.RoutesObserver
 import com.mapbox.navigation.core.formatter.MapboxDistanceFormatter
-import com.mapbox.navigation.core.lifecycle.MapboxNavigationApp
 import com.mapbox.navigation.core.trip.session.LocationMatcherResult
 import com.mapbox.navigation.core.trip.session.LocationObserver
 import com.mapbox.navigation.core.trip.session.RouteProgressObserver
 import com.mapbox.navigation.core.trip.session.VoiceInstructionsObserver
 import com.mapbox.navigation.tripdata.maneuver.api.MapboxManeuverApi
-import com.mapbox.navigation.ui.base.util.MapboxNavigationConsumer
+import com.mapbox.navigation.tripdata.maneuver.model.Maneuver
+import com.mapbox.navigation.tripdata.maneuver.model.ManeuverError
 import com.mapbox.navigation.ui.components.maneuver.model.ManeuverPrimaryOptions
 import com.mapbox.navigation.ui.components.maneuver.model.ManeuverSecondaryOptions
 import com.mapbox.navigation.ui.components.maneuver.model.ManeuverSubOptions
@@ -85,6 +101,7 @@ import com.mapbox.navigation.ui.components.maneuver.model.ManeuverViewOptions
 import com.mapbox.navigation.ui.components.maneuver.view.MapboxManeuverView
 import com.mapbox.navigation.ui.maps.camera.NavigationCamera
 import com.mapbox.navigation.ui.maps.camera.data.MapboxNavigationViewportDataSource
+import com.mapbox.navigation.ui.maps.camera.transition.NavigationCameraTransitionOptions
 import com.mapbox.navigation.ui.maps.location.NavigationLocationProvider
 import com.mapbox.navigation.ui.maps.route.arrow.api.MapboxRouteArrowApi
 import com.mapbox.navigation.ui.maps.route.arrow.api.MapboxRouteArrowView
@@ -102,16 +119,24 @@ import com.mapbox.navigation.voice.model.SpeechValue
 import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
-import android.graphics.RectF
-import android.graphics.Path
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.material.icons.outlined.Clear
+import java.util.concurrent.TimeUnit
 
 private enum class ScreenState {
     POI_OVERVIEW,
     ROUTE_PREVIEW,
     NAVIGATING
+}
+
+fun Context.findActivity(): Activity? {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is Activity) return context
+        context = context.baseContext
+    }
+    return null
 }
 
 @OptIn(MapboxExperimental::class)
@@ -123,34 +148,72 @@ fun NavigationScreen(
     poiLng: Double
 ) {
     val context = LocalContext.current
-    val mapboxNavigation = MapboxNavigationApp.current()
     val scope = rememberCoroutineScope()
+    val locationService = remember { LocationService(context) }
+
+    val mapboxNavigation = remember(context) {
+        if (MapboxOptions.accessToken == null) {
+            MapboxOptions.accessToken = context.getString(R.string.mapbox_access_token)
+        }
+
+        val navigationOptions = NavigationOptions.Builder(context)
+            .build()
+
+        MapboxNavigationProvider.create(navigationOptions)
+    }
+
+    DisposableEffect(mapboxNavigation) {
+        onDispose {
+            MapboxNavigationProvider.destroy()
+        }
+    }
 
     var screenState by remember { mutableStateOf(ScreenState.POI_OVERVIEW) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var originLabel by remember { mutableStateOf("Locating...") }
     val markerBitmap = rememberMarkerBitmap()
+    val puckBitmap = rememberLocationPuckBitmap()
+
+    var maneuversResult by remember { mutableStateOf<Expected<ManeuverError, List<Maneuver>>?>(null) }
+
+    fun setVolumeControl(streamType: Int) {
+        context.findActivity()?.volumeControlStream = streamType
+    }
+
     val speechApi = remember { MapboxSpeechApi(context, Locale.getDefault().toLanguageTag()) }
     val voiceInstructionsPlayer = remember { MapboxVoiceInstructionsPlayer(context, Locale.getDefault().toLanguageTag()) }
-    val voiceInstructionsPlayerCallback = remember {
-        MapboxNavigationConsumer<SpeechAnnouncement> { announcement -> speechApi.clean(announcement) }
+
+    val voiceInstructionsPlayerCallback = remember(context) {
+        { announcement: SpeechAnnouncement ->
+            speechApi.clean(announcement)
+            setVolumeControl(AudioManager.USE_DEFAULT_STREAM_TYPE)
+        }
     }
-    val speechCallback = remember {
-        MapboxNavigationConsumer<Expected<SpeechError, SpeechValue>> { expected ->
+
+    val speechCallback = remember(context, voiceInstructionsPlayerCallback) {
+        { expected: Expected<SpeechError, SpeechValue> ->
+            setVolumeControl(AudioManager.STREAM_MUSIC)
             expected.fold(
                 { error -> voiceInstructionsPlayer.play(error.fallback, voiceInstructionsPlayerCallback) },
                 { value -> voiceInstructionsPlayer.play(value.announcement, voiceInstructionsPlayerCallback) }
             )
         }
     }
-    val voiceInstructionsObserver = remember {
-        VoiceInstructionsObserver { voiceInstructions -> speechApi.generate(voiceInstructions, speechCallback) }
+
+    val voiceInstructionsObserver = remember(context, speechCallback) {
+        VoiceInstructionsObserver { voiceInstructions ->
+            speechApi.generate(voiceInstructions, speechCallback)
+        }
     }
 
     val distanceFormatterOptions = remember { DistanceFormatterOptions.Builder(context).build() }
-    val maneuverApi = remember { MapboxManeuverApi(MapboxDistanceFormatter(distanceFormatterOptions)) }
-    var maneuverView by remember { mutableStateOf<MapboxManeuverView?>(null) }
+    val distanceFormatter = remember { MapboxDistanceFormatter(distanceFormatterOptions) }
+    val maneuverApi = remember { MapboxManeuverApi(distanceFormatter) }
+
+    var routeTime by remember { mutableStateOf("") }
+    var routeDistance by remember { mutableStateOf("") }
+    var routeEta by remember { mutableStateOf("") }
 
     val routeLineColorResources = remember {
         RouteLineColorResources.Builder()
@@ -178,6 +241,7 @@ fun NavigationScreen(
         MapboxRouteLineView(
             MapboxRouteLineViewOptions.Builder(context)
                 .routeLineColorResources(routeLineColorResources)
+                .routeLineBelowLayerId("road-label")
                 .build()
         )
     }
@@ -191,14 +255,11 @@ fun NavigationScreen(
     var isStyleLoaded by remember { mutableStateOf(false) }
 
     fun fetchRoute() {
-        if (mapboxNavigation == null) return
-
         scope.launch {
             isLoading = true
             errorMessage = null
 
             try {
-                val locationService = LocationService(context)
                 val bestLocation = locationService.getBestLocationOrNull()
                 val originPoint = if (bestLocation != null) {
                     originLabel = "Current location"
@@ -261,7 +322,7 @@ fun NavigationScreen(
         }
     }
 
-    if (mapboxNavigation != null && mapView != null && isStyleLoaded) {
+    if (mapView != null && isStyleLoaded) {
         DisposableEffect(mapboxNavigation, mapView!!, isStyleLoaded) {
             val mapboxMap = mapView!!.getMapboxMap()
 
@@ -277,14 +338,37 @@ fun NavigationScreen(
 
                 mapView!!.location.apply {
                     enabled = true
-                    locationPuck = LocationPuck2D()
+                    puckBearingEnabled = true
+                    puckBearing = PuckBearing.COURSE
+                    locationPuck = LocationPuck2D(
+                        bearingImage = ImageHolder.from(puckBitmap),
+                        shadowImage = null,
+                        scaleExpression = null
+                    )
                     setLocationProvider(navigationLocationProvider)
+                }
+
+                if (screenState == ScreenState.NAVIGATING) {
+                    navigationCamera?.requestNavigationCameraToFollowing(
+                        stateTransitionOptions = NavigationCameraTransitionOptions.Builder()
+                            .maxDuration(0)
+                            .build()
+                    )
+                } else if (screenState == ScreenState.POI_OVERVIEW) {
+                    mapboxMap.setCamera(
+                        CameraOptions.Builder()
+                            .center(Point.fromLngLat(poiLng, poiLat))
+                            .zoom(15.0)
+                            .padding(EdgeInsets(0.0, 0.0, 0.0, 0.0))
+                            .build()
+                    )
                 }
             }
 
             val routesObserver = RoutesObserver { result ->
                 speechApi.cancel()
                 voiceInstructionsPlayer.clear()
+                setVolumeControl(AudioManager.USE_DEFAULT_STREAM_TYPE)
 
                 routeLineApi.setNavigationRoutes(result.navigationRoutes) { drawData ->
                     mapView?.getMapboxMap()?.let { map ->
@@ -328,11 +412,26 @@ fun NavigationScreen(
                     routeArrowView.renderManeuverUpdate(style, arrowUpdate)
                 }
 
-                val maneuvers = maneuverApi.getManeuvers(routeProgress)
-                maneuvers.fold({}, { list ->
-                    if (list.isNotEmpty()) maneuverView?.visibility = View.VISIBLE
-                })
-                maneuverView?.renderManeuvers(maneuvers)
+                maneuversResult = maneuverApi.getManeuvers(routeProgress)
+
+                val duration = routeProgress.durationRemaining
+                val distance = routeProgress.distanceRemaining
+
+                val hours = TimeUnit.SECONDS.toHours(duration.toLong())
+                val minutes = TimeUnit.SECONDS.toMinutes(duration.toLong()) % 60
+                val sb = StringBuilder()
+                if (hours > 0) {
+                    sb.append("$hours hr ")
+                }
+                sb.append("$minutes min")
+                routeTime = sb.toString()
+
+                routeDistance = distanceFormatter.formatDistance(distance.toDouble()).toString()
+
+                val calendar = Calendar.getInstance()
+                calendar.add(Calendar.SECOND, duration.toInt())
+                val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
+                routeEta = sdf.format(calendar.time)
             }
 
             mapboxNavigation.registerRoutesObserver(routesObserver)
@@ -359,10 +458,12 @@ fun NavigationScreen(
 
                 speechApi.cancel()
                 voiceInstructionsPlayer.shutdown()
+                setVolumeControl(AudioManager.USE_DEFAULT_STREAM_TYPE)
+
                 routeLineApi.cancel()
                 routeLineView.cancel()
                 maneuverApi.cancel()
-                maneuverView = null
+                maneuversResult = null
             }
         }
     }
@@ -399,8 +500,16 @@ fun NavigationScreen(
                                 }
                                 tintBlack(view)
                             }
-                            maneuverView = view
                             view
+                        },
+                        update = { view ->
+                            maneuversResult?.let { result ->
+                                view.renderManeuvers(result)
+                                val list = result.value
+                                view.visibility = if (list != null && list.isNotEmpty()) View.VISIBLE else View.GONE
+                            } ?: run {
+                                view.visibility = View.GONE
+                            }
                         }
                     )
                 } else if (screenState == ScreenState.ROUTE_PREVIEW || isLoading) {
@@ -408,13 +517,13 @@ fun NavigationScreen(
                         when(screenState) {
                             ScreenState.POI_OVERVIEW -> navController.popBackStack()
                             ScreenState.ROUTE_PREVIEW -> {
-                                mapboxNavigation?.setNavigationRoutes(emptyList())
+                                mapboxNavigation.setNavigationRoutes(emptyList())
                                 routeLineApi.clearRouteLine { }
                                 screenState = ScreenState.POI_OVERVIEW
                                 resetCameraToPoi()
                             }
                             ScreenState.NAVIGATING -> {
-                                mapboxNavigation?.stopTripSession()
+                                mapboxNavigation.stopTripSession()
                                 screenState = ScreenState.ROUTE_PREVIEW
                                 navigationCamera?.requestNavigationCameraToOverview()
                             }
@@ -461,7 +570,10 @@ fun NavigationScreen(
                     mapView = mapViewInstance
                     val styleUri = mapViewInstance.context.getString(R.string.mapbox_eink_style_uri)
                     mapViewInstance.getMapboxMap().apply {
-                        setCamera(CameraOptions.Builder().center(Point.fromLngLat(poiLng, poiLat)).zoom(15.0).build())
+                        if (screenState == ScreenState.POI_OVERVIEW) {
+                            setCamera(CameraOptions.Builder().center(Point.fromLngLat(poiLng, poiLat)).zoom(15.0).build())
+                        }
+
                         loadStyleUri(styleUri) { style ->
                             isStyleLoaded = true
                             style.styleLayers.forEach { layer ->
@@ -503,12 +615,17 @@ fun NavigationScreen(
                                 when (screenState) {
                                     ScreenState.POI_OVERVIEW -> fetchRoute()
                                     ScreenState.ROUTE_PREVIEW -> {
-                                        mapboxNavigation?.startTripSession()
+                                        mapboxNavigation.startTripSession()
                                         screenState = ScreenState.NAVIGATING
-                                        navigationCamera?.requestNavigationCameraToFollowing()
+
+                                        navigationCamera?.requestNavigationCameraToFollowing(
+                                            stateTransitionOptions = NavigationCameraTransitionOptions.Builder()
+                                                .maxDuration(0)
+                                                .build()
+                                        )
                                     }
                                     ScreenState.NAVIGATING -> {
-                                        mapboxNavigation?.stopTripSession()
+                                        mapboxNavigation.stopTripSession()
                                         screenState = ScreenState.ROUTE_PREVIEW
                                         navigationCamera?.requestNavigationCameraToOverview()
                                     }
@@ -539,15 +656,46 @@ fun NavigationScreen(
             ) {
                 HorizontalDividerMMD(thickness = 3.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
-                Column(
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(16.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Column {
+                        Text(
+                            text = routeTime,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = routeDistance,
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "•",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = routeEta,
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
 
                     IconButton(
-                        modifier = Modifier.padding(end = 16.dp),
+                        modifier = Modifier.size(48.dp),
                         onClick = {
-                            mapboxNavigation?.stopTripSession()
+                            mapboxNavigation.stopTripSession()
                             screenState = ScreenState.ROUTE_PREVIEW
                             navigationCamera?.requestNavigationCameraToOverview()
                         }
@@ -555,14 +703,10 @@ fun NavigationScreen(
                         Icon(
                             Icons.Outlined.Clear,
                             "End Navigation",
-                            tint = MaterialTheme.colorScheme.onSurface
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(32.dp)
                         )
                     }
-
-                    // add route time here
-                    // add route distance here
-                    // add eta here
-
                 }
             }
         }
@@ -593,16 +737,69 @@ private fun VerticalDottedLine(
     }
 }
 
+/**
+ * Creates a custom Bitmap for the user's location puck.
+ * Features: White Circle Background, Black Border, Black Arrow in Center.
+ */
+@Composable
+fun rememberLocationPuckBitmap(): Bitmap {
+    val context = LocalContext.current
+    return remember(context) {
+        val density = context.resources.displayMetrics.density
+        val sizePx = (48 * density).toInt()
+        val bitmap = createBitmap(sizePx, sizePx)
+
+        val canvas = AndroidCanvas(bitmap)
+
+        val cx = sizePx / 2f
+        val cy = sizePx / 2f
+        val outlineWidth = 4 * density
+        val radius = (sizePx / 2f) - (outlineWidth / 2)
+
+        val circlePaint = Paint().apply {
+            isAntiAlias = true
+            style = Paint.Style.FILL
+            color = AndroidColor.WHITE
+        }
+        canvas.drawCircle(cx, cy, radius, circlePaint)
+
+        val borderPaint = Paint().apply {
+            isAntiAlias = true
+            style = Paint.Style.STROKE
+            color = AndroidColor.BLACK
+            strokeWidth = outlineWidth
+        }
+        canvas.drawCircle(cx, cy, radius, borderPaint)
+
+        val arrowPaint = Paint().apply {
+            isAntiAlias = true
+            style = Paint.Style.FILL
+            color = AndroidColor.BLACK
+        }
+
+        val path = Path()
+        val arrowSize = radius * 1.2f
+
+        path.moveTo(cx, cy - (arrowSize / 2))
+        path.lineTo(cx + (arrowSize / 2.5f), cy + (arrowSize / 2))
+        path.lineTo(cx, cy + (arrowSize / 4))
+        path.lineTo(cx - (arrowSize / 2.5f), cy + (arrowSize / 2))
+        path.close()
+
+        canvas.drawPath(path, arrowPaint)
+        bitmap
+    }
+}
+
 @Composable
 fun rememberMarkerBitmap(): Bitmap? {
     val context = LocalContext.current
     return remember(context) {
         val width = 64
         val height = 76
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
+        val bitmap = createBitmap(width, height)
+        val canvas = AndroidCanvas(bitmap)
 
-        // Paints
         val fillPaint = Paint().apply {
             isAntiAlias = true
             style = Paint.Style.FILL

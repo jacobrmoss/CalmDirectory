@@ -10,6 +10,7 @@ data class Poi(
     val lat: Double?,
     val lng: Double?,
     val isOutsideSearchRadius: Boolean = false,
+    val isPlace: Boolean = true
 )
 
 data class Address(

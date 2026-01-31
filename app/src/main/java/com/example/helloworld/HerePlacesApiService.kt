@@ -76,11 +76,8 @@ class HerePlacesApiService(
                 val resolvedCountry = when (val code = addr?.countryCode) {
                     null, "" -> addr?.countryName ?: ""
                     else -> if (code.length == 2) {
-                        // Already an ISO 3166-1 alpha-2 code (e.g., "DE"). Use as-is.
                         code
                     } else {
-                        // For 3-letter codes like "DEU", prefer the human-readable country name
-                        // so that inferRegionCode can map it and the UI shows a friendly label.
                         addr?.countryName ?: code
                     }
                 }
@@ -125,7 +122,8 @@ class HerePlacesApiService(
                     website = item.contacts?.firstOrNull()?.www?.firstOrNull()?.value,
                     lat = itemLat,
                     lng = itemLon,
-                    isOutsideSearchRadius = isOutsideRadius
+                    isOutsideSearchRadius = isOutsideRadius,
+                    isPlace = item.resultType == "place"
                 )
             }
         } catch (e: Exception) {
@@ -140,7 +138,7 @@ class HerePlacesApiService(
         lat2: Double,
         lon2: Double
     ): Double {
-        val R = 6371000.0 // Earth radius in meters
+        val R = 6371000.0
         val dLat = Math.toRadians(lat2 - lat1)
         val dLon = Math.toRadians(lon2 - lon1)
         val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
@@ -181,6 +179,7 @@ private data class HereDiscoverResponse(
 @Serializable
 private data class HerePlaceItem(
     val title: String? = null,
+    val resultType: String? = null,
     val address: HereAddress? = null,
     val position: HerePosition? = null,
     val contacts: List<HereContacts>? = null,
