@@ -397,17 +397,12 @@ fun DirectoryTopAppBar(
                                 )
                             }
                         }
+
                         IconButton(onClick = {
                             val decodedAddress = URLDecoder.decode(
                                 poiAddress,
                                 StandardCharsets.UTF_8.toString()
                             )
-                            val clipboard =
-                                context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("address", decodedAddress)
-                            clipboard.setPrimaryClip(clip)
-                            Toast.makeText(context, "Address copied to clipboard", Toast.LENGTH_SHORT)
-                                .show()
 
                             if (lat != null && lng != null) {
                                 val encodedName = URLEncoder.encode(
@@ -427,6 +422,7 @@ fun DirectoryTopAppBar(
                                 modifier = Modifier.size(28.dp)
                             )
                         }
+
                         val dialNumber = formatPhoneNumberForDial(decodedPoiPhone, poiCountry)
                         val hasDialablePhone = dialNumber.any { it.isDigit() }
                         if (hasDialablePhone) {
