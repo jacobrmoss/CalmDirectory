@@ -522,11 +522,8 @@ fun NavigationScreen(
                                 screenState = ScreenState.POI_OVERVIEW
                                 resetCameraToPoi()
                             }
-                            ScreenState.NAVIGATING -> {
-                                mapboxNavigation.stopTripSession()
-                                screenState = ScreenState.ROUTE_PREVIEW
-                                navigationCamera?.requestNavigationCameraToOverview()
-                            }
+
+                            else -> {null}
                         }
                     }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -623,12 +620,7 @@ fun NavigationScreen(
                                                 .maxDuration(0)
                                                 .build()
                                         )
-                                    }
-                                    ScreenState.NAVIGATING -> {
-                                        mapboxNavigation.stopTripSession()
-                                        screenState = ScreenState.ROUTE_PREVIEW
-                                        navigationCamera?.requestNavigationCameraToOverview()
-                                    }
+                                    } else -> {null}
                                 }
                             },
                             enabled = !isLoading && errorMessage == null,
@@ -638,7 +630,7 @@ fun NavigationScreen(
                                 text = when (screenState) {
                                     ScreenState.POI_OVERVIEW -> "Get Directions"
                                     ScreenState.ROUTE_PREVIEW -> "Start Navigation"
-                                    ScreenState.NAVIGATING -> "End Navigation"
+                                    else -> {""}
                                 }
                             )
                         }
@@ -696,6 +688,12 @@ fun NavigationScreen(
                         modifier = Modifier.size(48.dp),
                         onClick = {
                             mapboxNavigation.stopTripSession()
+                            speechApi.cancel()
+                            voiceInstructionsPlayer.clear()
+                            setVolumeControl(AudioManager.USE_DEFAULT_STREAM_TYPE)
+                            mapView?.getMapboxMap()?.getStyle()?.let { style ->
+                                routeArrowView.render(style, routeArrowApi.clearArrows())
+                            }
                             screenState = ScreenState.ROUTE_PREVIEW
                             navigationCamera?.requestNavigationCameraToOverview()
                         }
