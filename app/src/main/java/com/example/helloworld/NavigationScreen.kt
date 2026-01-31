@@ -80,6 +80,7 @@ import com.mapbox.maps.extension.style.layers.properties.generated.IconAnchor
 import com.mapbox.maps.plugin.LocationPuck2D
 import com.mapbox.maps.plugin.PuckBearing
 import com.mapbox.maps.plugin.animation.camera
+import com.mapbox.maps.plugin.locationcomponent.LocationComponentConstants
 import com.mapbox.maps.plugin.locationcomponent.location
 import com.mapbox.navigation.base.extensions.applyDefaultNavigationOptions
 import com.mapbox.navigation.base.extensions.applyLanguageAndVoiceUnitOptions
@@ -262,7 +263,7 @@ fun NavigationScreen(
         MapboxRouteLineView(
             MapboxRouteLineViewOptions.Builder(context)
                 .routeLineColorResources(routeLineColorResources)
-                .routeLineBelowLayerId("road-label")
+                .routeLineBelowLayerId(LocationComponentConstants.LOCATION_INDICATOR_LAYER)
                 .build()
         )
     }
@@ -582,16 +583,14 @@ fun NavigationScreen(
                             if (isPlace) {
                                 Text(
                                     text = poiName,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                HorizontalDividerMMD(
-                                    thickness = 1.dp,
-                                    color = MaterialTheme.colorScheme.outlineVariant,
-                                    modifier = Modifier.padding(vertical = 8.dp)
-                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
                                 Text(
                                     text = poiAddress,
                                     fontSize = 16.sp,
@@ -625,22 +624,25 @@ fun NavigationScreen(
                                         }
                                     }
 
-                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
+
                                     Text(
                                         text = distanceString,
-                                        fontSize = 14.sp,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
 
                             } else {
                                 Text(
                                     text = poiName,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
+
                                 currentUserLocation?.let { loc ->
                                     val results = FloatArray(1)
                                     android.location.Location.distanceBetween(
@@ -667,11 +669,12 @@ fun NavigationScreen(
                                         }
                                     }
 
-                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
+
                                     Text(
                                         text = distanceString,
                                         fontSize = 14.sp,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
