@@ -89,7 +89,9 @@ fun SearchScreenHost(
                 } else {
                     if (poi.lat != null && poi.lng != null) {
                         val encodedName = URLEncoder.encode(poi.name, StandardCharsets.UTF_8.toString())
-                        val route = "map?poiName=$encodedName&lat=${poi.lat}&lng=${poi.lng}"
+                        val addressString = "${poi.address.street}, ${poi.address.city}, ${poi.address.state} ${poi.address.zip}, ${poi.address.country}"
+                        val encodedAddress = URLEncoder.encode(addressString, StandardCharsets.UTF_8.toString())
+                        val route = "map?poiName=$encodedName&poiAddress=$encodedAddress&isPlace=false&lat=${poi.lat}&lng=${poi.lng}"
                         navController.navigate(route)
                     }
                 }

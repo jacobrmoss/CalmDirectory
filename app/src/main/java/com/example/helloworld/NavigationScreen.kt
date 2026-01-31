@@ -39,6 +39,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,12 +52,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.createBitmap
 import androidx.navigation.NavController
 import com.calmapps.directory.R
+import com.example.helloworld.data.DistanceUnit
+import com.example.helloworld.data.UserPreferencesRepository
 import com.mapbox.api.directions.v5.models.RouteOptions
 import com.mapbox.bindgen.Expected
 import com.mapbox.bindgen.Value
@@ -79,6 +84,7 @@ import com.mapbox.maps.plugin.locationcomponent.location
 import com.mapbox.navigation.base.extensions.applyDefaultNavigationOptions
 import com.mapbox.navigation.base.extensions.applyLanguageAndVoiceUnitOptions
 import com.mapbox.navigation.base.formatter.DistanceFormatterOptions
+import com.mapbox.navigation.base.formatter.UnitType
 import com.mapbox.navigation.base.options.NavigationOptions
 import com.mapbox.navigation.base.route.NavigationRoute
 import com.mapbox.navigation.base.route.NavigationRouterCallback
@@ -144,12 +150,21 @@ fun Context.findActivity(): Activity? {
 fun NavigationScreen(
     navController: NavController,
     poiName: String,
+    poiAddress: String,
+    isPlace: Boolean,
     poiLat: Double,
     poiLng: Double
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val locationService = remember { LocationService(context) }
+    val userPreferencesRepository = remember { UserPreferencesRepository(context) }
+    val distanceUnit by userPreferencesRepository.distanceUnit.collectAsState(initial = DistanceUnit.IMPERIAL)
+
+    var currentUserLocation by remember { mutableStateOf<android.location.Location?>(null) }
+    LaunchedEffect(Unit) {
+        currentUserLocation = locationService.getBestLocationOrNull()
+    }
 
     val mapboxNavigation = remember(context) {
         if (MapboxOptions.accessToken == null) {
@@ -207,9 +222,15 @@ fun NavigationScreen(
         }
     }
 
-    val distanceFormatterOptions = remember { DistanceFormatterOptions.Builder(context).build() }
-    val distanceFormatter = remember { MapboxDistanceFormatter(distanceFormatterOptions) }
-    val maneuverApi = remember { MapboxManeuverApi(distanceFormatter) }
+    val distanceFormatterOptions = remember(distanceUnit) {
+        DistanceFormatterOptions.Builder(context)
+            .unitType(
+                if (distanceUnit == DistanceUnit.IMPERIAL) UnitType.IMPERIAL else UnitType.METRIC
+            )
+            .build()
+    }
+    val distanceFormatter = remember(distanceFormatterOptions) { MapboxDistanceFormatter(distanceFormatterOptions) }
+    val maneuverApi = remember(distanceFormatter) { MapboxManeuverApi(distanceFormatter) }
 
     var routeTime by remember { mutableStateOf("") }
     var routeDistance by remember { mutableStateOf("") }
@@ -512,7 +533,7 @@ fun NavigationScreen(
                             }
                         }
                     )
-                } else if (screenState == ScreenState.ROUTE_PREVIEW || isLoading) {
+                } else if (screenState == ScreenState.ROUTE_PREVIEW || isLoading || screenState == ScreenState.POI_OVERVIEW) {
                     IconButton(onClick = {
                         when(screenState) {
                             ScreenState.POI_OVERVIEW -> navController.popBackStack()
@@ -531,23 +552,129 @@ fun NavigationScreen(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 4.dp)) {
-                            Icon(Icons.Outlined.RadioButtonUnchecked, "Origin", tint = MaterialTheme.colorScheme.onSurface)
-                            VerticalDottedLine(modifier = Modifier.width(2.dp).height(32.dp))
-                            Icon(Icons.Outlined.Place, "Destination", tint = MaterialTheme.colorScheme.onSurface)
+                    if (screenState == ScreenState.ROUTE_PREVIEW || isLoading) {
+                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 4.dp)) {
+                                Icon(Icons.Outlined.RadioButtonUnchecked, "Origin", tint = MaterialTheme.colorScheme.onSurface)
+                                VerticalDottedLine(modifier = Modifier.width(2.dp).height(32.dp))
+                                Icon(Icons.Outlined.Place, "Destination", tint = MaterialTheme.colorScheme.onSurface)
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 16.dp)
+                            ) {
+                                Text(originLabel, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                HorizontalDividerMMD(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 16.dp))
+                                Text(poiName, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            }
                         }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
+                    } else {
                         Column(
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(end = 16.dp)
+                                .padding(end = 16.dp),
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            Text(originLabel, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                            HorizontalDividerMMD(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 16.dp))
-                            Text(poiName, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            if (isPlace) {
+                                Text(
+                                    text = poiName,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                HorizontalDividerMMD(
+                                    thickness = 1.dp,
+                                    color = MaterialTheme.colorScheme.outlineVariant,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                                Text(
+                                    text = poiAddress,
+                                    fontSize = 16.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
+                                currentUserLocation?.let { loc ->
+                                    val results = FloatArray(1)
+                                    android.location.Location.distanceBetween(
+                                        loc.latitude,
+                                        loc.longitude,
+                                        poiLat,
+                                        poiLng,
+                                        results
+                                    )
+                                    val distanceInMeters = results[0]
+
+                                    val distanceString = if (distanceUnit == DistanceUnit.IMPERIAL) {
+                                        val miles = distanceInMeters * 0.000621371
+                                        if (miles >= 0.1) {
+                                            "%.1f mi".format(miles)
+                                        } else {
+                                            "%.0f ft".format(distanceInMeters * 3.28084)
+                                        }
+                                    } else {
+                                        if (distanceInMeters >= 1000) {
+                                            "%.1f km".format(distanceInMeters / 1000)
+                                        } else {
+                                            "%.0f m".format(distanceInMeters)
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = distanceString,
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                    )
+                                }
+
+                            } else {
+                                Text(
+                                    text = poiName,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                currentUserLocation?.let { loc ->
+                                    val results = FloatArray(1)
+                                    android.location.Location.distanceBetween(
+                                        loc.latitude,
+                                        loc.longitude,
+                                        poiLat,
+                                        poiLng,
+                                        results
+                                    )
+                                    val distanceInMeters = results[0]
+
+                                    val distanceString = if (distanceUnit == DistanceUnit.IMPERIAL) {
+                                        val miles = distanceInMeters * 0.000621371
+                                        if (miles >= 0.1) {
+                                            "%.1f mi".format(miles)
+                                        } else {
+                                            "%.0f ft".format(distanceInMeters * 3.28084)
+                                        }
+                                    } else {
+                                        if (distanceInMeters >= 1000) {
+                                            "%.1f km".format(distanceInMeters / 1000)
+                                        } else {
+                                            "%.0f m".format(distanceInMeters)
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = distanceString,
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                    )
+                                }
+                            }
                         }
                     }
                 }

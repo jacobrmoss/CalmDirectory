@@ -13,6 +13,11 @@ import kotlinx.coroutines.flow.map
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
+enum class DistanceUnit {
+    IMPERIAL,
+    METRIC
+}
+
 class UserPreferencesRepository(
     private val context: Context
 ) {
@@ -23,7 +28,6 @@ class UserPreferencesRepository(
 
     val useDeviceLocation: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
-            // Default to NOT using device location so onboarding can prompt for a manual location.
             preferences[USE_DEVICE_LOCATION] ?: false
         }
 
@@ -40,14 +44,26 @@ class UserPreferencesRepository(
     val searchProvider: Flow<SearchProvider> = context.dataStore.data
         .map { preferences ->
             val stored = preferences[SEARCH_PROVIDER]
-            // Default to HERE so the app works out of the box, and gracefully
-            // fall back if an unknown value (e.g. a removed provider) is stored.
             SearchProvider.values().firstOrNull { it.name == stored } ?: SearchProvider.HERE
         }
 
     val searchRadius: Flow<Int> = context.dataStore.data
         .map { preferences ->
-            preferences[SEARCH_RADIUS] ?: 10 // default 10 miles
+            preferences[SEARCH_RADIUS] ?: 10
+        }
+
+    val distanceUnit: Flow<DistanceUnit> = context.dataStore.data
+        .map { preferences ->
+            val stored = preferences[DISTANCE_UNIT]
+            if (stored != null) {
+                try {
+                    DistanceUnit.valueOf(stored)
+                } catch (e: IllegalArgumentException) {
+                    DistanceUnit.IMPERIAL
+                }
+            } else {
+                DistanceUnit.IMPERIAL
+            }
         }
 
     suspend fun saveGoogleApiKey(apiKey: String) {
@@ -86,13 +102,19 @@ class UserPreferencesRepository(
         }
     }
 
+    suspend fun saveDistanceUnit(unit: DistanceUnit) {
+        context.dataStore.edit { settings ->
+            settings[DISTANCE_UNIT] = unit.name
+        }
+    }
+
     private companion object {
         val API_KEY = stringPreferencesKey("api_key")
         val USE_DEVICE_LOCATION = booleanPreferencesKey("use_device_location")
         val DEFAULT_LOCATION = stringPreferencesKey("default_location")
         val MAP_APP = stringPreferencesKey("map_app")
         val SEARCH_PROVIDER = stringPreferencesKey("search_provider")
-        val SEARCH_RADIUS = intPreferencesKey("search_radius") // in miles
-
+        val SEARCH_RADIUS = intPreferencesKey("search_radius")
+        val DISTANCE_UNIT = stringPreferencesKey("distance_unit")
     }
 }

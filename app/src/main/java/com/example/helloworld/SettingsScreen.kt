@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.helloworld.data.DistanceUnit
 import com.example.helloworld.data.MapApp
 import com.example.helloworld.data.SearchProvider
 import com.example.helloworld.data.UserPreferencesRepository
@@ -53,6 +54,7 @@ import com.mudita.mmd.components.search_bar.SearchBarDefaultsMMD
 import com.mudita.mmd.components.slider.SliderMMD
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -83,6 +85,7 @@ fun SettingsScreen(
     var searchProvider by remember { mutableStateOf<SearchProvider?>(null) }
     val locationSettingsBringIntoViewRequester = remember { BringIntoViewRequester() }
     val suggestionsBringIntoViewRequester = remember { BringIntoViewRequester() }
+    val distanceUnit by userPreferencesRepository.distanceUnit.collectAsState(initial = DistanceUnit.IMPERIAL)
 
     val requestLocationPermissionLauncher =
         rememberLauncherForActivityResult(
@@ -124,7 +127,6 @@ fun SettingsScreen(
 
     LaunchedEffect(isEditingLocation, locationSuggestions) {
         if (isEditingLocation && locationSuggestions.isNotEmpty()) {
-            // Ensure the suggestions box is fully visible above the keyboard
             suggestionsBringIntoViewRequester.bringIntoView()
         }
     }
@@ -240,7 +242,69 @@ fun SettingsScreen(
 
         item {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                Text(text = "Search Radius: ${sliderValue.toInt()} miles")
+                Text(text = "Distance Units", fontSize = 16.sp)
+                Spacer(modifier = Modifier.padding(4.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            coroutineScope.launch {
+                                userPreferencesRepository.saveDistanceUnit(DistanceUnit.IMPERIAL)
+                            }
+                        }
+                ) {
+                    RadioButtonMMD(
+                        selected = distanceUnit == DistanceUnit.IMPERIAL,
+                        onClick = null,
+                        modifier = Modifier.semantics{ contentDescription = "Imperial" }
+                    )
+                    Text(text = "Imperial (mi, ft)", modifier = Modifier.padding(start = 8.dp))
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                        .clickable {
+                            coroutineScope.launch {
+                                userPreferencesRepository.saveDistanceUnit(DistanceUnit.METRIC)
+                            }
+                        }
+                ) {
+                    RadioButtonMMD(
+                        selected = distanceUnit == DistanceUnit.METRIC,
+                        onClick = null,
+                        modifier = Modifier.semantics{ contentDescription = "Metric" }
+                    )
+                    Text(text = "Metric (km, m)", modifier = Modifier.padding(start = 8.dp))
+                }
+
+                Spacer(modifier = Modifier.padding(16.dp))
+
+                HorizontalDividerMMD(
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.padding(16.dp))
+        }
+
+        item {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                val radiusText = if (distanceUnit == DistanceUnit.METRIC) {
+                    val km = sliderValue.toInt() * 1.60934
+                    "Search Radius: %.1f km".format(Locale.US, km)
+                } else {
+                    "Search Radius: ${sliderValue.toInt()} miles"
+                }
+
+                Text(text = radiusText)
 
                 SliderMMD(
                     value = sliderValue,
@@ -252,7 +316,7 @@ fun SettingsScreen(
                         }
                     },
                     valueRange = 1f..20f,
-                    steps = 18, // 1-mile increments (20 - 1 - 1)
+                    steps = 18,
                     interactionSource = interactionSource,
                     modifier = Modifier
                         .fillMaxWidth()

@@ -81,10 +81,8 @@ class MainActivity : ComponentActivity() {
                 val mainViewModel: MainViewModel = viewModel()
                 val apiKey by mainViewModel.apiKey.collectAsState()
                 val focusRequester = remember { FocusRequester() }
-
                 val currentRoute = navBackStackEntry?.destination?.route
-
-                val isFullScreenMapRoute = currentRoute == "map?poiName={poiName}&lat={lat}&lng={lng}"
+                val isFullScreenMapRoute = currentRoute?.startsWith("map?") == true
 
                 Scaffold(
                     topBar = {
@@ -153,11 +151,19 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable(
-                            "map?poiName={poiName}&lat={lat}&lng={lng}",
+                            "map?poiName={poiName}&poiAddress={poiAddress}&isPlace={isPlace}&lat={lat}&lng={lng}",
                             arguments = listOf(
                                 navArgument("poiName") {
                                     type = NavType.StringType
                                     defaultValue = ""
+                                },
+                                navArgument("poiAddress") {
+                                    type = NavType.StringType
+                                    defaultValue = ""
+                                },
+                                navArgument("isPlace") {
+                                    type = NavType.BoolType
+                                    defaultValue = true
                                 },
                                 navArgument("lat") {
                                     type = NavType.FloatType
@@ -172,6 +178,12 @@ class MainActivity : ComponentActivity() {
                                 encodedName,
                                 StandardCharsets.UTF_8.toString()
                             )
+                            val encodedAddress = backStackEntry.arguments?.getString("poiAddress") ?: ""
+                            val poiAddress = URLDecoder.decode(
+                                encodedAddress,
+                                StandardCharsets.UTF_8.toString()
+                            )
+                            val isPlace = backStackEntry.arguments?.getBoolean("isPlace") ?: true
                             val poiLat: Double = backStackEntry.arguments?.getFloat("lat")?.toDouble()
                                 ?: 0.0
                             val poiLng: Double = backStackEntry.arguments?.getFloat("lng")?.toDouble()
@@ -180,12 +192,12 @@ class MainActivity : ComponentActivity() {
                             NavigationScreen(
                                 navController = navController,
                                 poiName = poiName,
+                                poiAddress = poiAddress,
+                                isPlace = isPlace,
                                 poiLat = poiLat,
                                 poiLng = poiLng
                             )
                         }
-
-                        // DELETED: The "navigation" route was removed here as it is no longer used.
 
                         composable(
                             "details/{poiName}/{poiAddress}/{poiCountry}/{poiPhone}/{poiDescription}/{poiHours}?poiWebsite={poiWebsite}&lat={lat}&lng={lng}",
@@ -402,8 +414,10 @@ fun DirectoryTopAppBar(
                                     navBackStackEntry.arguments?.getString("poiName"),
                                     StandardCharsets.UTF_8.toString()
                                 )
+
+                                val encodedAddressArg = URLEncoder.encode(decodedAddress, StandardCharsets.UTF_8.toString())
                                 navController.navigate(
-                                    "map?poiName=$encodedName&lat=$lat&lng=$lng"
+                                    "map?poiName=$encodedName&poiAddress=$encodedAddressArg&isPlace=true&lat=$lat&lng=$lng"
                                 )
                             }
                         }) {
