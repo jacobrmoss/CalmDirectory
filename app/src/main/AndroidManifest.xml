@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:name="com.example.helloworld.MyApplication"
@@ -15,6 +16,10 @@
         android:roundIcon="@drawable/ic_launcher_foreground"
         android:supportsRtl="true"
         android:theme="@style/Theme.HelloWorld">
+
+        <service
+            android:name="com.example.helloworld.NavigationOverlayService"
+            android:exported="false" />
 
         <meta-data
             android:name="com.google.android.geo.API_KEY"

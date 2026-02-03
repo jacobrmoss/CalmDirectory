@@ -21,4 +21,24 @@
         <item name="android:tint">#000000</item>
         <item name="maneuverTurnIconShadowColor">#808080</item>
     </style>
+    <style name="ManeuverTextAppearance.Overlay" parent="TextAppearance.AppCompat.Body1">
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColorHighlight">#FFFFFF</item>
+        <item name="android:textColorHint">#FFFFFF</item>
+    </style>
+
+    <style name="MapboxCustomManeuverTurnIconStyle.Overlay" parent="MapboxStyleTurnIconManeuver">
+        <item name="maneuverTurnIconColor">#FFFFFF</item>
+        <item name="maneuverTurnIconShadowColor">#00000000</item>
+    </style>
+
+    <style name="MapboxCustomManeuverStyle.Overlay" parent="MapboxStyleManeuverView">
+        <item name="maneuverViewBackgroundColor">@android:color/transparent</item>
+        <item name="subManeuverViewBackgroundColor">@android:color/transparent</item>
+        <item name="upcomingManeuverViewBackgroundColor">@android:color/transparent</item>
+        <item name="maneuverViewIconStyle">@style/MapboxCustomManeuverTurnIconStyle.Overlay</item>
+        <item name="laneGuidanceManeuverIconStyle">@style/MapboxCustomManeuverTurnIconStyle.Overlay</item>
+    </style>
 </resources>

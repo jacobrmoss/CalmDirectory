@@ -3,6 +3,7 @@ package com.example.helloworld
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Color as AndroidColor
@@ -10,10 +11,13 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.media.AudioManager
+import android.net.Uri
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.TextView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,12 +56,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavController
 import com.calmapps.directory.R
 import com.example.helloworld.data.DistanceUnit
@@ -64,7 +73,6 @@ import com.example.helloworld.data.UserPreferencesRepository
 import com.mapbox.api.directions.v5.models.RouteOptions
 import com.mapbox.bindgen.Expected
 import com.mapbox.bindgen.Value
-import com.mapbox.common.MapboxOptions
 import com.mapbox.common.location.Location
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
@@ -86,12 +94,9 @@ import com.mapbox.navigation.base.extensions.applyDefaultNavigationOptions
 import com.mapbox.navigation.base.extensions.applyLanguageAndVoiceUnitOptions
 import com.mapbox.navigation.base.formatter.DistanceFormatterOptions
 import com.mapbox.navigation.base.formatter.UnitType
-import com.mapbox.navigation.base.options.NavigationOptions
 import com.mapbox.navigation.base.route.NavigationRoute
 import com.mapbox.navigation.base.route.NavigationRouterCallback
 import com.mapbox.navigation.base.route.RouterFailure
-import com.mapbox.navigation.core.MapboxNavigation
-import com.mapbox.navigation.core.MapboxNavigationProvider
 import com.mapbox.navigation.core.directions.session.RoutesObserver
 import com.mapbox.navigation.core.formatter.MapboxDistanceFormatter
 import com.mapbox.navigation.core.trip.session.LocationMatcherResult
@@ -125,11 +130,15 @@ import com.mapbox.navigation.voice.model.SpeechError
 import com.mapbox.navigation.voice.model.SpeechValue
 import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
+import com.mudita.mmd.components.bottom_sheet.ModalBottomSheetMMD
+import com.mudita.mmd.components.bottom_sheet.rememberModalBottomSheetMMDState
+import com.mudita.mmd.components.buttons.OutlinedButtonMMD
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import android.view.ContextThemeWrapper
 
 private enum class ScreenState {
     POI_OVERVIEW,
@@ -146,7 +155,7 @@ fun Context.findActivity(): Activity? {
     return null
 }
 
-@OptIn(MapboxExperimental::class)
+@OptIn(MapboxExperimental::class, ExperimentalMaterial3Api::class)
 @Composable
 fun NavigationScreen(
     navController: NavController,
@@ -157,6 +166,7 @@ fun NavigationScreen(
     poiLng: Double
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     val locationService = remember { LocationService(context) }
     val userPreferencesRepository = remember { UserPreferencesRepository(context) }
@@ -168,19 +178,12 @@ fun NavigationScreen(
     }
 
     val mapboxNavigation = remember(context) {
-        if (MapboxOptions.accessToken == null) {
-            MapboxOptions.accessToken = context.getString(R.string.mapbox_access_token)
-        }
-
-        val navigationOptions = NavigationOptions.Builder(context)
-            .build()
-
-        MapboxNavigationProvider.create(navigationOptions)
+        NavigationManager.getInstance(context)
     }
 
     DisposableEffect(mapboxNavigation) {
         onDispose {
-            MapboxNavigationProvider.destroy()
+            // Do NOT destroy here.
         }
     }
 
@@ -192,6 +195,23 @@ fun NavigationScreen(
     val puckBitmap = rememberLocationPuckBitmap()
 
     var maneuversResult by remember { mutableStateOf<Expected<ManeuverError, List<Maneuver>>?>(null) }
+
+    var showOverlayPermissionSheet by remember { mutableStateOf(false) }
+    val overlaySheetState = rememberModalBottomSheetMMDState()
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (showOverlayPermissionSheet && Settings.canDrawOverlays(context)) {
+                    showOverlayPermissionSheet = false
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     fun setVolumeControl(streamType: Int) {
         context.findActivity()?.volumeControlStream = streamType
@@ -240,7 +260,7 @@ fun NavigationScreen(
     val routeLineColorResources = remember {
         RouteLineColorResources.Builder()
             .routeDefaultColor(AndroidColor.BLACK)
-            .routeLineTraveledColor(AndroidColor.BLACK)
+            .routeLineTraveledColor(AndroidColor.TRANSPARENT)
             .routeLowCongestionColor(AndroidColor.BLACK)
             .routeModerateCongestionColor(AndroidColor.BLACK)
             .routeHeavyCongestionColor(AndroidColor.BLACK)
@@ -502,22 +522,27 @@ fun NavigationScreen(
                     AndroidView(
                         modifier = Modifier.fillMaxWidth(),
                         factory = { ctx ->
-                            val view = LayoutInflater.from(ctx).inflate(R.layout.view_maneuver, null, false) as MapboxManeuverView
-                            val white = android.R.color.white
+                            val wrappedContext = ContextThemeWrapper(ctx, R.style.Theme_HelloWorld)
+                            val view = LayoutInflater.from(wrappedContext).inflate(R.layout.view_maneuver, null, false) as MapboxManeuverView
+                            val whiteRes = android.R.color.white
                             val blackStyle = R.style.ManeuverTextAppearance
+
                             val options = ManeuverViewOptions.Builder()
-                                .maneuverBackgroundColor(white)
-                                .subManeuverBackgroundColor(white)
-                                .upcomingManeuverBackgroundColor(white)
+                                .maneuverBackgroundColor(whiteRes)
+                                .subManeuverBackgroundColor(whiteRes)
+                                .upcomingManeuverBackgroundColor(whiteRes)
                                 .stepDistanceTextAppearance(blackStyle)
                                 .primaryManeuverOptions(ManeuverPrimaryOptions.Builder().textAppearance(blackStyle).build())
                                 .secondaryManeuverOptions(ManeuverSecondaryOptions.Builder().textAppearance(blackStyle).build())
                                 .subManeuverOptions(ManeuverSubOptions.Builder().textAppearance(blackStyle).build())
                                 .build()
+
                             view.updateManeuverViewOptions(options)
                             view.post {
+                                val black = android.graphics.Color.BLACK
                                 fun tintBlack(v: View) {
-                                    if (v is ImageView) v.setColorFilter(AndroidColor.BLACK)
+                                    if (v is ImageView) v.setColorFilter(black)
+                                    else if (v is TextView) v.setTextColor(black)
                                     else if (v is ViewGroup) (0 until v.childCount).forEach { tintBlack(v.getChildAt(it)) }
                                 }
                                 tintBlack(view)
@@ -529,6 +554,16 @@ fun NavigationScreen(
                                 view.renderManeuvers(result)
                                 val list = result.value
                                 view.visibility = if (list != null && list.isNotEmpty()) View.VISIBLE else View.GONE
+
+                                view.post {
+                                    val black = android.graphics.Color.BLACK
+                                    fun tintBlack(v: View) {
+                                        if (v is ImageView) v.setColorFilter(black)
+                                        else if (v is TextView) v.setTextColor(black)
+                                        else if (v is ViewGroup) (0 until v.childCount).forEach { tintBlack(v.getChildAt(it)) }
+                                    }
+                                    tintBlack(view)
+                                }
                             } ?: run {
                                 view.visibility = View.GONE
                             }
@@ -742,14 +777,19 @@ fun NavigationScreen(
                                 when (screenState) {
                                     ScreenState.POI_OVERVIEW -> fetchRoute()
                                     ScreenState.ROUTE_PREVIEW -> {
-                                        mapboxNavigation.startTripSession()
-                                        screenState = ScreenState.NAVIGATING
-
-                                        navigationCamera?.requestNavigationCameraToFollowing(
-                                            stateTransitionOptions = NavigationCameraTransitionOptions.Builder()
-                                                .maxDuration(0)
-                                                .build()
-                                        )
+                                        if (Settings.canDrawOverlays(context)) {
+                                            mapboxNavigation.startTripSession()
+                                            screenState = ScreenState.NAVIGATING
+                                            NavigationManager.setNavigationActive(true)
+                                            context.startService(Intent(context, NavigationOverlayService::class.java))
+                                            navigationCamera?.requestNavigationCameraToFollowing(
+                                                stateTransitionOptions = NavigationCameraTransitionOptions.Builder()
+                                                    .maxDuration(0)
+                                                    .build()
+                                            )
+                                        } else {
+                                            showOverlayPermissionSheet = true
+                                        }
                                     } else -> {null}
                                 }
                             },
@@ -818,12 +858,17 @@ fun NavigationScreen(
                         modifier = Modifier.size(48.dp),
                         onClick = {
                             mapboxNavigation.stopTripSession()
+                            NavigationManager.setNavigationActive(false)
+                            context.stopService(Intent(context, NavigationOverlayService::class.java))
+
                             speechApi.cancel()
                             voiceInstructionsPlayer.clear()
                             setVolumeControl(AudioManager.USE_DEFAULT_STREAM_TYPE)
                             mapView?.getMapboxMap()?.getStyle()?.let { style ->
                                 routeArrowView.render(style, routeArrowApi.clearArrows())
                             }
+
+                            NavigationManager.destroy()
                             screenState = ScreenState.ROUTE_PREVIEW
                             navigationCamera?.requestNavigationCameraToOverview()
                         }
@@ -836,6 +881,66 @@ fun NavigationScreen(
                         )
                     }
                 }
+            }
+        }
+    }
+
+    if (showOverlayPermissionSheet) {
+        ModalBottomSheetMMD(
+            onDismissRequest = { showOverlayPermissionSheet = false },
+            sheetState = overlaySheetState,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+            ) {
+                Text(
+                    text = "Permission Required",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "So you don't miss a turn while changing a song or taking a call, " +
+                            "please enable this permission so Directory can display the next " +
+                            "Maneuver over other apps.",
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(bottom = 24.dp)
+                )
+
+                ButtonMMD(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        val intent = Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:${context.packageName}")
+                        )
+                        context.startActivity(intent)
+                    },
+                    contentPadding = PaddingValues(16.dp)
+                ) {
+                    Text("Open Settings")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedButtonMMD(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { showOverlayPermissionSheet = false },
+                    contentPadding = PaddingValues(16.dp)
+                ) {
+                    Text(
+                        text = "Cancel",
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
@@ -865,10 +970,6 @@ private fun VerticalDottedLine(
     }
 }
 
-/**
- * Creates a custom Bitmap for the user's location puck.
- * Features: White Circle Background, Black Border, Black Arrow in Center.
- */
 @Composable
 fun rememberLocationPuckBitmap(): Bitmap {
     val context = LocalContext.current

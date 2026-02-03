@@ -270,6 +270,16 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onPause() {
+        super.onPause()
+        NavigationManager.setAppInForeground(false)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        NavigationManager.setAppInForeground(true)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
