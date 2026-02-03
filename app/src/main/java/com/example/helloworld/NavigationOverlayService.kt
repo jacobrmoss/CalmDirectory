@@ -17,7 +17,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -174,7 +174,8 @@ class NavigationOverlayService : Service() {
             modifier = Modifier
                 .padding(8.dp)
                 .clip(RoundedCornerShape(24.dp))
-                .background(Color.Black)
+                .background(Color.White)
+                .border(2.dp, Color.Black, RoundedCornerShape(24.dp))
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDragStart = { showCloseTarget() },
@@ -185,19 +186,48 @@ class NavigationOverlayService : Service() {
                         moveOverlayBy(dragAmount.x, dragAmount.y)
                     }
                 }
-                .clickable {
-                    val intent = Intent(this@NavigationOverlayService, MainActivity::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    }
-                    startActivity(intent)
-                    removeOverlayView()
-                }
         ) {
             AndroidView(
                 modifier = Modifier.width(300.dp).wrapContentHeight(),
                 factory = { ctx ->
                     val wrappedContext = ContextThemeWrapper(ctx, R.style.Theme_HelloWorld)
-                    LayoutInflater.from(wrappedContext).inflate(R.layout.view_maneuver, null, false) as MapboxManeuverView
+                    val view = LayoutInflater.from(wrappedContext).inflate(R.layout.view_maneuver, null, false) as MapboxManeuverView
+
+                    val whiteRes = android.R.color.white
+                    val blackStyle = R.style.ManeuverTextAppearance
+
+                    val options = ManeuverViewOptions.Builder()
+                        .maneuverBackgroundColor(whiteRes)
+                        .subManeuverBackgroundColor(whiteRes)
+                        .upcomingManeuverBackgroundColor(whiteRes)
+                        .stepDistanceTextAppearance(blackStyle)
+                        .primaryManeuverOptions(ManeuverPrimaryOptions.Builder().textAppearance(blackStyle).build())
+                        .secondaryManeuverOptions(ManeuverSecondaryOptions.Builder().textAppearance(blackStyle).build())
+                        .subManeuverOptions(ManeuverSubOptions.Builder().textAppearance(blackStyle).build())
+                        .build()
+
+                    view.updateManeuverViewOptions(options)
+
+                    view.post {
+                        val black = android.graphics.Color.BLACK
+                        fun tintBlack(v: View) {
+                            if (v is ImageView) v.setColorFilter(black)
+                            else if (v is TextView) v.setTextColor(black)
+                            else if (v is ViewGroup) (0 until v.childCount).forEach { tintBlack(v.getChildAt(it)) }
+                        }
+                        tintBlack(view)
+                    }
+
+                    // Long click to open the app
+                    view.setOnLongClickListener {
+                        val intent = Intent(this@NavigationOverlayService, MainActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        }
+                        startActivity(intent)
+                        true
+                    }
+
+                    view
                 },
                 update = { view ->
                     maneuversResult?.let { result ->
