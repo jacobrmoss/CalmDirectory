@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        MapboxNavigationApp.attach(this)
+//        MapboxNavigationApp.attach(this)
 
         setContent {
             CalmDirectoryTheme {

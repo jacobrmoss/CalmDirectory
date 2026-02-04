@@ -1,9 +1,11 @@
 package com.example.helloworld
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Color as AndroidColor
@@ -12,12 +14,17 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.media.AudioManager
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
+import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -88,7 +95,6 @@ import com.mapbox.maps.extension.style.layers.properties.generated.IconAnchor
 import com.mapbox.maps.plugin.LocationPuck2D
 import com.mapbox.maps.plugin.PuckBearing
 import com.mapbox.maps.plugin.animation.camera
-import com.mapbox.maps.plugin.locationcomponent.LocationComponentConstants
 import com.mapbox.maps.plugin.locationcomponent.location
 import com.mapbox.navigation.base.extensions.applyDefaultNavigationOptions
 import com.mapbox.navigation.base.extensions.applyLanguageAndVoiceUnitOptions
@@ -138,7 +144,6 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import java.util.concurrent.TimeUnit
-import android.view.ContextThemeWrapper
 
 private enum class ScreenState {
     POI_OVERVIEW,
@@ -181,12 +186,6 @@ fun NavigationScreen(
         NavigationManager.getInstance(context)
     }
 
-    DisposableEffect(mapboxNavigation) {
-        onDispose {
-            // Do NOT destroy here.
-        }
-    }
-
     var screenState by remember { mutableStateOf(ScreenState.POI_OVERVIEW) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -198,20 +197,6 @@ fun NavigationScreen(
 
     var showOverlayPermissionSheet by remember { mutableStateOf(false) }
     val overlaySheetState = rememberModalBottomSheetMMDState()
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                if (showOverlayPermissionSheet && Settings.canDrawOverlays(context)) {
-                    showOverlayPermissionSheet = false
-                }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
 
     fun setVolumeControl(streamType: Int) {
         context.findActivity()?.volumeControlStream = streamType
@@ -243,6 +228,30 @@ fun NavigationScreen(
         }
     }
 
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (showOverlayPermissionSheet && Settings.canDrawOverlays(context)) {
+                    showOverlayPermissionSheet = false
+                }
+
+                mapboxNavigation.registerVoiceInstructionsObserver(voiceInstructionsObserver)
+            } else if (event == Lifecycle.Event.ON_PAUSE) {
+                mapboxNavigation.unregisterVoiceInstructionsObserver(voiceInstructionsObserver)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            mapboxNavigation.registerVoiceInstructionsObserver(voiceInstructionsObserver)
+        }
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            mapboxNavigation.unregisterVoiceInstructionsObserver(voiceInstructionsObserver)
+        }
+    }
+
     val distanceFormatterOptions = remember(distanceUnit) {
         DistanceFormatterOptions.Builder(context)
             .unitType(
@@ -260,7 +269,7 @@ fun NavigationScreen(
     val routeLineColorResources = remember {
         RouteLineColorResources.Builder()
             .routeDefaultColor(AndroidColor.BLACK)
-            .routeLineTraveledColor(AndroidColor.TRANSPARENT)
+            .routeLineTraveledColor(AndroidColor.WHITE)
             .routeLowCongestionColor(AndroidColor.BLACK)
             .routeModerateCongestionColor(AndroidColor.BLACK)
             .routeHeavyCongestionColor(AndroidColor.BLACK)
@@ -283,7 +292,7 @@ fun NavigationScreen(
         MapboxRouteLineView(
             MapboxRouteLineViewOptions.Builder(context)
                 .routeLineColorResources(routeLineColorResources)
-                .routeLineBelowLayerId(LocationComponentConstants.LOCATION_INDICATOR_LAYER)
+                .routeLineBelowLayerId("waterway-label")
                 .build()
         )
     }
@@ -361,6 +370,70 @@ fun NavigationScreen(
                     .padding(EdgeInsets(0.0, 0.0, 0.0, 0.0))
                     .build()
             )
+        }
+    }
+
+    fun stopNavigationSession() {
+        mapboxNavigation.stopTripSession()
+        NavigationManager.setNavigationActive(false)
+        context.stopService(Intent(context, NavigationOverlayService::class.java))
+
+        speechApi.cancel()
+        voiceInstructionsPlayer.clear()
+        setVolumeControl(AudioManager.USE_DEFAULT_STREAM_TYPE)
+        mapView?.getMapboxMap()?.getStyle()?.let { style ->
+            routeArrowView.render(style, routeArrowApi.clearArrows())
+        }
+
+        screenState = ScreenState.ROUTE_PREVIEW
+        navigationCamera?.requestNavigationCameraToOverview()
+    }
+
+    fun clearRouteAndReturnToOverview() {
+        mapboxNavigation.setNavigationRoutes(emptyList())
+        routeLineApi.clearRouteLine { value ->
+            mapView?.getMapboxMap()?.getStyle()?.let { style ->
+                routeLineView.renderClearRouteLineValue(style, value)
+            }
+        }
+        screenState = ScreenState.POI_OVERVIEW
+        resetCameraToPoi()
+    }
+
+    fun startNavigation() {
+        if (Settings.canDrawOverlays(context)) {
+            mapboxNavigation.startTripSession()
+            screenState = ScreenState.NAVIGATING
+            NavigationManager.setNavigationActive(true)
+            context.startService(Intent(context, NavigationOverlayService::class.java))
+            navigationCamera?.requestNavigationCameraToFollowing(
+                stateTransitionOptions = NavigationCameraTransitionOptions.Builder()
+                    .maxDuration(0)
+                    .build()
+            )
+        } else {
+            showOverlayPermissionSheet = true
+        }
+    }
+
+    val postNotificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            startNavigation()
+        }
+    )
+
+    BackHandler(enabled = true) {
+        when (screenState) {
+            ScreenState.NAVIGATING -> {
+                stopNavigationSession()
+            }
+            ScreenState.ROUTE_PREVIEW -> {
+                clearRouteAndReturnToOverview()
+            }
+            ScreenState.POI_OVERVIEW -> {
+                navController.popBackStack()
+            }
         }
     }
 
@@ -479,7 +552,6 @@ fun NavigationScreen(
             mapboxNavigation.registerRoutesObserver(routesObserver)
             mapboxNavigation.registerLocationObserver(locationObserver)
             mapboxNavigation.registerRouteProgressObserver(routeProgressObserver)
-            mapboxNavigation.registerVoiceInstructionsObserver(voiceInstructionsObserver)
 
             val currentRoutes = mapboxNavigation.getNavigationRoutes()
             if (currentRoutes.isNotEmpty()) {
@@ -494,8 +566,11 @@ fun NavigationScreen(
                 mapboxNavigation.unregisterRoutesObserver(routesObserver)
                 mapboxNavigation.unregisterLocationObserver(locationObserver)
                 mapboxNavigation.unregisterRouteProgressObserver(routeProgressObserver)
-                mapboxNavigation.unregisterVoiceInstructionsObserver(voiceInstructionsObserver)
-                mapboxNavigation.setNavigationRoutes(emptyList())
+
+                if (!NavigationManager.isNavigationActive.value) {
+                    mapboxNavigation.setNavigationRoutes(emptyList())
+                }
+
                 routeLineApi.clearRouteLine { }
 
                 speechApi.cancel()
@@ -574,12 +649,8 @@ fun NavigationScreen(
                         when(screenState) {
                             ScreenState.POI_OVERVIEW -> navController.popBackStack()
                             ScreenState.ROUTE_PREVIEW -> {
-                                mapboxNavigation.setNavigationRoutes(emptyList())
-                                routeLineApi.clearRouteLine { }
-                                screenState = ScreenState.POI_OVERVIEW
-                                resetCameraToPoi()
+                                clearRouteAndReturnToOverview()
                             }
-
                             else -> {null}
                         }
                     }) {
@@ -777,18 +848,19 @@ fun NavigationScreen(
                                 when (screenState) {
                                     ScreenState.POI_OVERVIEW -> fetchRoute()
                                     ScreenState.ROUTE_PREVIEW -> {
-                                        if (Settings.canDrawOverlays(context)) {
-                                            mapboxNavigation.startTripSession()
-                                            screenState = ScreenState.NAVIGATING
-                                            NavigationManager.setNavigationActive(true)
-                                            context.startService(Intent(context, NavigationOverlayService::class.java))
-                                            navigationCamera?.requestNavigationCameraToFollowing(
-                                                stateTransitionOptions = NavigationCameraTransitionOptions.Builder()
-                                                    .maxDuration(0)
-                                                    .build()
-                                            )
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                            val hasPermission = ContextCompat.checkSelfPermission(
+                                                context,
+                                                Manifest.permission.POST_NOTIFICATIONS
+                                            ) == PackageManager.PERMISSION_GRANTED
+
+                                            if (!hasPermission) {
+                                                postNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                            } else {
+                                                startNavigation()
+                                            }
                                         } else {
-                                            showOverlayPermissionSheet = true
+                                            startNavigation()
                                         }
                                     } else -> {null}
                                 }
@@ -857,20 +929,7 @@ fun NavigationScreen(
                     IconButton(
                         modifier = Modifier.size(48.dp),
                         onClick = {
-                            mapboxNavigation.stopTripSession()
-                            NavigationManager.setNavigationActive(false)
-                            context.stopService(Intent(context, NavigationOverlayService::class.java))
-
-                            speechApi.cancel()
-                            voiceInstructionsPlayer.clear()
-                            setVolumeControl(AudioManager.USE_DEFAULT_STREAM_TYPE)
-                            mapView?.getMapboxMap()?.getStyle()?.let { style ->
-                                routeArrowView.render(style, routeArrowApi.clearArrows())
-                            }
-
-                            NavigationManager.destroy()
-                            screenState = ScreenState.ROUTE_PREVIEW
-                            navigationCamera?.requestNavigationCameraToOverview()
+                            stopNavigationSession()
                         }
                     ) {
                         Icon(

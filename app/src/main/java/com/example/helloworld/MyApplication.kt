@@ -12,11 +12,11 @@ class MyApplication : Application() {
         val accessToken = getString(R.string.mapbox_access_token)
         com.mapbox.common.MapboxOptions.accessToken = accessToken
 
-        if (!MapboxNavigationApp.isSetup()) {
-            MapboxNavigationApp.setup(
-                NavigationOptions.Builder(this)
-                    .build()
-            )
-        }
+//        if (!MapboxNavigationApp.isSetup()) {
+//            MapboxNavigationApp.setup(
+//                NavigationOptions.Builder(this)
+//                    .build()
+//            )
+//        }
     }
 }

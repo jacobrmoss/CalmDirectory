@@ -26,7 +26,8 @@ object NavigationManager {
                 MapboxOptions.accessToken = context.getString(R.string.mapbox_access_token)
             }
 
-            val navigationOptions = NavigationOptions.Builder(context).build()
+            val navigationOptions = NavigationOptions.Builder(context.applicationContext)
+                .build()
             _mapboxNavigation = MapboxNavigationProvider.create(navigationOptions)
         }
         return _mapboxNavigation!!
