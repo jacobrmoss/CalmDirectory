@@ -1,11 +1,13 @@
 package com.example.helloworld
 
-import android.content.ClipData
-import android.content.ClipboardManager
+import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.util.Rational
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -31,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,8 +69,13 @@ import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
+val LocalPipMode = compositionLocalOf { false }
+
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
+
+    private var isPipMode by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -75,195 +83,198 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             CalmDirectoryTheme {
-                val navController = rememberNavController()
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val searchViewModel: SearchViewModel = viewModel()
-                val mainViewModel: MainViewModel = viewModel()
-                val apiKey by mainViewModel.apiKey.collectAsState()
-                val focusRequester = remember { FocusRequester() }
-                val currentRoute = navBackStackEntry?.destination?.route
-                val isFullScreenMapRoute = currentRoute?.startsWith("map?") == true
+                CompositionLocalProvider(LocalPipMode provides isPipMode) {
+                    val navController = rememberNavController()
+                    val navBackStackEntry by navController.currentBackStackEntryAsState()
+                    val searchViewModel: SearchViewModel = viewModel()
+                    val mainViewModel: MainViewModel = viewModel()
+                    val apiKey by mainViewModel.apiKey.collectAsState()
+                    val focusRequester = remember { FocusRequester() }
+                    val currentRoute = navBackStackEntry?.destination?.route
+                    val isFullScreenMapRoute = currentRoute?.startsWith("map?") == true
 
-                Scaffold(
-                    topBar = {
-                        if (!isFullScreenMapRoute) {
-                            DirectoryTopAppBar(
-                                navController = navController,
-                                navBackStackEntry = navBackStackEntry,
-                                searchViewModel = searchViewModel,
-                                apiKey = apiKey,
-                                focusRequester = focusRequester
-                            )
-                        }
-                    }
-                ) { paddingValues ->
-                    val navModifier = if (isFullScreenMapRoute) {
-                        Modifier
-                    } else {
-                        Modifier.padding(paddingValues)
-                    }
-                    NavHost(
-                        navController = navController,
-                        startDestination = "main",
-                        modifier = navModifier,
-                    ) {
-                        composable("main") { MainScreen(navController, searchViewModel = searchViewModel) }
-                        composable("settings") {
-                            val scrollToLocationSettings =
-                                navController.previousBackStackEntry?.savedStateHandle?.get<Boolean>(
-                                    "scrollToLocationSettings"
-                                ) == true
-                            SettingsScreen(
-                                navController = navController,
-                                searchViewModel = searchViewModel,
-                                scrollToLocationSettings = scrollToLocationSettings
-                            )
-                        }
-                        composable(
-                            "search?query={query}&autoFocus={autoFocus}",
-                            arguments = listOf(
-                                navArgument("query") {
-                                    defaultValue = ""
-                                    type = NavType.StringType
-                                },
-                                navArgument("autoFocus") {
-                                    defaultValue = false
-                                    type = NavType.BoolType
-                                }
-                            )
-                        ) { backStackEntry ->
-                            val query = backStackEntry.arguments?.getString("query") ?: ""
-                            val autoFocus =
-                                backStackEntry.arguments?.getBoolean("autoFocus") ?: false
-                            var wasFocused by rememberSaveable { mutableStateOf(false) }
-
-                            LaunchedEffect(autoFocus, wasFocused) {
-                                if (autoFocus && !wasFocused) {
-                                    focusRequester.requestFocus()
-                                    wasFocused = true
-                                }
+                    Scaffold(
+                        topBar = {
+                            if (!isFullScreenMapRoute && !isPipMode) {
+                                DirectoryTopAppBar(
+                                    navController = navController,
+                                    navBackStackEntry = navBackStackEntry,
+                                    searchViewModel = searchViewModel,
+                                    apiKey = apiKey,
+                                    focusRequester = focusRequester
+                                )
                             }
-                            SearchScreenHost(
-                                navController = navController,
-                                query = query,
-                                searchViewModel = searchViewModel
-                            )
+                        }
+                    ) { paddingValues ->
+                        val navModifier = if (isFullScreenMapRoute) {
+                            Modifier
+                        } else {
+                            Modifier.padding(paddingValues)
                         }
 
-                        composable(
-                            "map?poiName={poiName}&poiAddress={poiAddress}&isPlace={isPlace}&lat={lat}&lng={lng}",
-                            arguments = listOf(
-                                navArgument("poiName") {
-                                    type = NavType.StringType
-                                    defaultValue = ""
-                                },
-                                navArgument("poiAddress") {
-                                    type = NavType.StringType
-                                    defaultValue = ""
-                                },
-                                navArgument("isPlace") {
-                                    type = NavType.BoolType
-                                    defaultValue = true
-                                },
-                                navArgument("lat") {
-                                    type = NavType.FloatType
-                                },
-                                navArgument("lng") {
-                                    type = NavType.FloatType
-                                }
-                            )
-                        ) { backStackEntry ->
-                            val encodedName = backStackEntry.arguments?.getString("poiName") ?: ""
-                            val poiName = URLDecoder.decode(
-                                encodedName,
-                                StandardCharsets.UTF_8.toString()
-                            )
-                            val encodedAddress = backStackEntry.arguments?.getString("poiAddress") ?: ""
-                            val poiAddress = URLDecoder.decode(
-                                encodedAddress,
-                                StandardCharsets.UTF_8.toString()
-                            )
-                            val isPlace = backStackEntry.arguments?.getBoolean("isPlace") ?: true
-                            val poiLat: Double = backStackEntry.arguments?.getFloat("lat")?.toDouble()
-                                ?: 0.0
-                            val poiLng: Double = backStackEntry.arguments?.getFloat("lng")?.toDouble()
-                                ?: 0.0
+                        NavHost(
+                            navController = navController,
+                            startDestination = "main",
+                            modifier = navModifier,
+                        ) {
+                            composable("main") { MainScreen(navController, searchViewModel = searchViewModel) }
+                            composable("settings") {
+                                val scrollToLocationSettings =
+                                    navController.previousBackStackEntry?.savedStateHandle?.get<Boolean>(
+                                        "scrollToLocationSettings"
+                                    ) == true
+                                SettingsScreen(
+                                    navController = navController,
+                                    searchViewModel = searchViewModel,
+                                    scrollToLocationSettings = scrollToLocationSettings
+                                )
+                            }
+                            composable(
+                                "search?query={query}&autoFocus={autoFocus}",
+                                arguments = listOf(
+                                    navArgument("query") {
+                                        defaultValue = ""
+                                        type = NavType.StringType
+                                    },
+                                    navArgument("autoFocus") {
+                                        defaultValue = false
+                                        type = NavType.BoolType
+                                    }
+                                )
+                            ) { backStackEntry ->
+                                val query = backStackEntry.arguments?.getString("query") ?: ""
+                                val autoFocus =
+                                    backStackEntry.arguments?.getBoolean("autoFocus") ?: false
+                                var wasFocused by rememberSaveable { mutableStateOf(false) }
 
-                            NavigationScreen(
-                                navController = navController,
-                                poiName = poiName,
-                                poiAddress = poiAddress,
-                                isPlace = isPlace,
-                                poiLat = poiLat,
-                                poiLng = poiLng
-                            )
-                        }
+                                LaunchedEffect(autoFocus, wasFocused) {
+                                    if (autoFocus && !wasFocused) {
+                                        focusRequester.requestFocus()
+                                        wasFocused = true
+                                    }
+                                }
+                                SearchScreenHost(
+                                    navController = navController,
+                                    query = query,
+                                    searchViewModel = searchViewModel
+                                )
+                            }
 
-                        composable(
-                            "details/{poiName}/{poiAddress}/{poiCountry}/{poiPhone}/{poiDescription}/{poiHours}?poiWebsite={poiWebsite}&lat={lat}&lng={lng}",
-                            arguments = listOf(
-                                navArgument("poiWebsite") {
-                                    type = NavType.StringType
-                                    nullable = true
-                                },
-                                navArgument("lat") {
-                                    type = NavType.FloatType
-                                },
-                                navArgument("lng") {
-                                    type = NavType.FloatType
-                                }
-                            )
-                        ) { backStackEntry ->
-                            val poiName = URLDecoder.decode(
-                                backStackEntry.arguments?.getString("poiName")?.replace("%2F", "/"),
-                                StandardCharsets.UTF_8.toString()
-                            )
-                            val poiAddress = URLDecoder.decode(
-                                backStackEntry.arguments?.getString("poiAddress")
-                                    ?.replace("%2F", "/"),
-                                StandardCharsets.UTF_8.toString()
-                            )
-                            val poiCountry = URLDecoder.decode(
-                                backStackEntry.arguments?.getString("poiCountry")
-                                    ?.replace("%2F", "/"),
-                                StandardCharsets.UTF_8.toString()
-                            )
-                            val rawPoiPhone = backStackEntry.arguments?.getString("poiPhone")
-                                ?.replace("%2F", "/")
-                                ?.let { URLDecoder.decode(it, StandardCharsets.UTF_8.toString()) }
-                                ?: ""
-                            val poiPhone =
-                                if (rawPoiPhone == "NA" || rawPoiPhone == "N/A") "" else rawPoiPhone
-                            val poiDescription = URLDecoder.decode(
-                                backStackEntry.arguments?.getString("poiDescription")
-                                    ?.replace("%2F", "/"),
-                                StandardCharsets.UTF_8.toString()
-                            )
-                            val poiHoursString = URLDecoder.decode(
-                                backStackEntry.arguments?.getString("poiHours")?.replace("%2F", "/"),
-                                StandardCharsets.UTF_8.toString()
-                            )
-                            val poiHours =
-                                if (poiHoursString == "NA" || poiHoursString == "N/A") {
-                                    emptyList()
-                                } else {
-                                    poiHoursString.split(",")
-                                }
-                            val poiLat: Double? = backStackEntry.arguments?.getFloat("lat")?.toDouble()
-                            val poiLng: Double? = backStackEntry.arguments?.getFloat("lng")?.toDouble()
-                            val poiWebsite = backStackEntry.arguments?.getString("poiWebsite")
-                            PoiDetailsScreen(
-                                poiName = poiName,
-                                poiAddress = poiAddress,
-                                poiCountry = poiCountry,
-                                poiPhone = poiPhone,
-                                poiDescription = poiDescription,
-                                poiHours = poiHours,
-                                poiWebsite = poiWebsite,
-                                poiLat = poiLat,
-                                poiLng = poiLng,
-                                navController = navController
-                            )
+                            composable(
+                                "map?poiName={poiName}&poiAddress={poiAddress}&isPlace={isPlace}&lat={lat}&lng={lng}",
+                                arguments = listOf(
+                                    navArgument("poiName") {
+                                        type = NavType.StringType
+                                        defaultValue = ""
+                                    },
+                                    navArgument("poiAddress") {
+                                        type = NavType.StringType
+                                        defaultValue = ""
+                                    },
+                                    navArgument("isPlace") {
+                                        type = NavType.BoolType
+                                        defaultValue = true
+                                    },
+                                    navArgument("lat") {
+                                        type = NavType.FloatType
+                                    },
+                                    navArgument("lng") {
+                                        type = NavType.FloatType
+                                    }
+                                )
+                            ) { backStackEntry ->
+                                val encodedName = backStackEntry.arguments?.getString("poiName") ?: ""
+                                val poiName = URLDecoder.decode(
+                                    encodedName,
+                                    StandardCharsets.UTF_8.toString()
+                                )
+                                val encodedAddress = backStackEntry.arguments?.getString("poiAddress") ?: ""
+                                val poiAddress = URLDecoder.decode(
+                                    encodedAddress,
+                                    StandardCharsets.UTF_8.toString()
+                                )
+                                val isPlace = backStackEntry.arguments?.getBoolean("isPlace") ?: true
+                                val poiLat: Double = backStackEntry.arguments?.getFloat("lat")?.toDouble()
+                                    ?: 0.0
+                                val poiLng: Double = backStackEntry.arguments?.getFloat("lng")?.toDouble()
+                                    ?: 0.0
+
+                                NavigationScreen(
+                                    navController = navController,
+                                    poiName = poiName,
+                                    poiAddress = poiAddress,
+                                    isPlace = isPlace,
+                                    poiLat = poiLat,
+                                    poiLng = poiLng
+                                )
+                            }
+
+                            composable(
+                                "details/{poiName}/{poiAddress}/{poiCountry}/{poiPhone}/{poiDescription}/{poiHours}?poiWebsite={poiWebsite}&lat={lat}&lng={lng}",
+                                arguments = listOf(
+                                    navArgument("poiWebsite") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                    },
+                                    navArgument("lat") {
+                                        type = NavType.FloatType
+                                    },
+                                    navArgument("lng") {
+                                        type = NavType.FloatType
+                                    }
+                                )
+                            ) { backStackEntry ->
+                                val poiName = URLDecoder.decode(
+                                    backStackEntry.arguments?.getString("poiName")?.replace("%2F", "/"),
+                                    StandardCharsets.UTF_8.toString()
+                                )
+                                val poiAddress = URLDecoder.decode(
+                                    backStackEntry.arguments?.getString("poiAddress")
+                                        ?.replace("%2F", "/"),
+                                    StandardCharsets.UTF_8.toString()
+                                )
+                                val poiCountry = URLDecoder.decode(
+                                    backStackEntry.arguments?.getString("poiCountry")
+                                        ?.replace("%2F", "/"),
+                                    StandardCharsets.UTF_8.toString()
+                                )
+                                val rawPoiPhone = backStackEntry.arguments?.getString("poiPhone")
+                                    ?.replace("%2F", "/")
+                                    ?.let { URLDecoder.decode(it, StandardCharsets.UTF_8.toString()) }
+                                    ?: ""
+                                val poiPhone =
+                                    if (rawPoiPhone == "NA" || rawPoiPhone == "N/A") "" else rawPoiPhone
+                                val poiDescription = URLDecoder.decode(
+                                    backStackEntry.arguments?.getString("poiDescription")
+                                        ?.replace("%2F", "/"),
+                                    StandardCharsets.UTF_8.toString()
+                                )
+                                val poiHoursString = URLDecoder.decode(
+                                    backStackEntry.arguments?.getString("poiHours")?.replace("%2F", "/"),
+                                    StandardCharsets.UTF_8.toString()
+                                )
+                                val poiHours =
+                                    if (poiHoursString == "NA" || poiHoursString == "N/A") {
+                                        emptyList()
+                                    } else {
+                                        poiHoursString.split(",")
+                                    }
+                                val poiLat: Double? = backStackEntry.arguments?.getFloat("lat")?.toDouble()
+                                val poiLng: Double? = backStackEntry.arguments?.getFloat("lng")?.toDouble()
+                                val poiWebsite = backStackEntry.arguments?.getString("poiWebsite")
+                                PoiDetailsScreen(
+                                    poiName = poiName,
+                                    poiAddress = poiAddress,
+                                    poiCountry = poiCountry,
+                                    poiPhone = poiPhone,
+                                    poiDescription = poiDescription,
+                                    poiHours = poiHours,
+                                    poiWebsite = poiWebsite,
+                                    poiLat = poiLat,
+                                    poiLng = poiLng,
+                                    navController = navController
+                                )
+                            }
                         }
                     }
                 }
@@ -271,9 +282,32 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (NavigationManager.isNavigationActive.value) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val aspectRatio = Rational(16, 9)
+                val params = PictureInPictureParams.Builder()
+                    .setAspectRatio(aspectRatio)
+                    .build()
+                enterPictureInPictureMode(params)
+            }
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        isPipMode = isInPictureInPictureMode
+    }
+
     override fun onPause() {
         super.onPause()
-        NavigationManager.setAppInForeground(false)
+        if (!isInPictureInPictureMode) {
+            NavigationManager.setAppInForeground(false)
+        }
     }
 
     override fun onResume() {

@@ -1,11 +1,9 @@
 package com.example.helloworld
 
-import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Color as AndroidColor
@@ -13,9 +11,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.media.AudioManager
-import android.net.Uri
 import android.os.Build
-import android.provider.Settings
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
@@ -23,21 +19,22 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Clear
@@ -62,15 +59,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color as ComposeColor
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
-import androidx.core.graphics.createBitmap
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavController
@@ -136,9 +134,6 @@ import com.mapbox.navigation.voice.model.SpeechError
 import com.mapbox.navigation.voice.model.SpeechValue
 import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
-import com.mudita.mmd.components.bottom_sheet.ModalBottomSheetMMD
-import com.mudita.mmd.components.bottom_sheet.rememberModalBottomSheetMMDState
-import com.mudita.mmd.components.buttons.OutlinedButtonMMD
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -172,6 +167,7 @@ fun NavigationScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val isPipMode = LocalPipMode.current
     val scope = rememberCoroutineScope()
     val locationService = remember { LocationService(context) }
     val userPreferencesRepository = remember { UserPreferencesRepository(context) }
@@ -195,8 +191,9 @@ fun NavigationScreen(
 
     var maneuversResult by remember { mutableStateOf<Expected<ManeuverError, List<Maneuver>>?>(null) }
 
-    var showOverlayPermissionSheet by remember { mutableStateOf(false) }
-    val overlaySheetState = rememberModalBottomSheetMMDState()
+    val density = LocalDensity.current
+    var topBarHeight by remember { mutableStateOf(0.dp) }
+    var bottomBarHeight by remember { mutableStateOf(0.dp) }
 
     fun setVolumeControl(streamType: Int) {
         context.findActivity()?.volumeControlStream = streamType
@@ -231,13 +228,18 @@ fun NavigationScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                if (showOverlayPermissionSheet && Settings.canDrawOverlays(context)) {
-                    showOverlayPermissionSheet = false
-                }
-
                 mapboxNavigation.registerVoiceInstructionsObserver(voiceInstructionsObserver)
             } else if (event == Lifecycle.Event.ON_PAUSE) {
-                mapboxNavigation.unregisterVoiceInstructionsObserver(voiceInstructionsObserver)
+                val activity = context.findActivity()
+                val isInPip = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    activity?.isInPictureInPictureMode == true
+                } else {
+                    false
+                }
+
+                if (!isInPip) {
+                    mapboxNavigation.unregisterVoiceInstructionsObserver(voiceInstructionsObserver)
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -302,7 +304,19 @@ fun NavigationScreen(
     val navigationLocationProvider = remember { NavigationLocationProvider() }
     var mapView by remember { mutableStateOf<MapView?>(null) }
     var navigationCamera by remember { mutableStateOf<NavigationCamera?>(null) }
+
+    LaunchedEffect(isPipMode) {
+        if (isPipMode) {
+            navigationCamera?.requestNavigationCameraToFollowing(
+                stateTransitionOptions = NavigationCameraTransitionOptions.Builder()
+                    .maxDuration(0)
+                    .build()
+            )
+        }
+    }
+
     var viewportDataSource by remember { mutableStateOf<MapboxNavigationViewportDataSource?>(null) }
+
     var isStyleLoaded by remember { mutableStateOf(false) }
 
     fun fetchRoute() {
@@ -401,27 +415,16 @@ fun NavigationScreen(
     }
 
     fun startNavigation() {
-        if (Settings.canDrawOverlays(context)) {
-            mapboxNavigation.startTripSession()
-            screenState = ScreenState.NAVIGATING
-            NavigationManager.setNavigationActive(true)
-            context.startService(Intent(context, NavigationOverlayService::class.java))
-            navigationCamera?.requestNavigationCameraToFollowing(
-                stateTransitionOptions = NavigationCameraTransitionOptions.Builder()
-                    .maxDuration(0)
-                    .build()
-            )
-        } else {
-            showOverlayPermissionSheet = true
-        }
+        mapboxNavigation.startTripSession()
+        screenState = ScreenState.NAVIGATING
+        NavigationManager.setNavigationActive(true)
+        context.startService(Intent(context, NavigationOverlayService::class.java))
+        navigationCamera?.requestNavigationCameraToFollowing(
+            stateTransitionOptions = NavigationCameraTransitionOptions.Builder()
+                .maxDuration(0)
+                .build()
+        )
     }
-
-    val postNotificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { isGranted ->
-            startNavigation()
-        }
-    )
 
     BackHandler(enabled = true) {
         when (screenState) {
@@ -462,7 +465,6 @@ fun NavigationScreen(
                     )
                     setLocationProvider(navigationLocationProvider)
                 }
-
                 if (screenState == ScreenState.NAVIGATING) {
                     navigationCamera?.requestNavigationCameraToFollowing(
                         stateTransitionOptions = NavigationCameraTransitionOptions.Builder()
@@ -471,11 +473,7 @@ fun NavigationScreen(
                     )
                 } else if (screenState == ScreenState.POI_OVERVIEW) {
                     mapboxMap.setCamera(
-                        CameraOptions.Builder()
-                            .center(Point.fromLngLat(poiLng, poiLat))
-                            .zoom(15.0)
-                            .padding(EdgeInsets(0.0, 0.0, 0.0, 0.0))
-                            .build()
+                        CameraOptions.Builder().center(Point.fromLngLat(poiLng, poiLat)).zoom(15.0).build()
                     )
                 }
             }
@@ -501,7 +499,6 @@ fun NavigationScreen(
                     if (screenState == ScreenState.POI_OVERVIEW) {
                         screenState = ScreenState.ROUTE_PREVIEW
                         navigationCamera?.requestNavigationCameraToOverview()
-
                     } else if (screenState == ScreenState.ROUTE_PREVIEW) {
                         navigationCamera?.requestNavigationCameraToOverview()
                     }
@@ -585,220 +582,85 @@ fun NavigationScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
 
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
+        if (isPipMode) {
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = if (screenState == ScreenState.NAVIGATING) 0.dp else 16.dp)
+                    .fillMaxSize()
+                    .background(ComposeColor.White),
+                contentAlignment = Alignment.Center
             ) {
-                if (screenState == ScreenState.NAVIGATING) {
-                    AndroidView(
-                        modifier = Modifier.fillMaxWidth(),
-                        factory = { ctx ->
-                            val wrappedContext = ContextThemeWrapper(ctx, R.style.Theme_HelloWorld)
-                            val view = LayoutInflater.from(wrappedContext).inflate(R.layout.view_maneuver, null, false) as MapboxManeuverView
-                            val whiteRes = android.R.color.white
-                            val blackStyle = R.style.ManeuverTextAppearance
-
-                            val options = ManeuverViewOptions.Builder()
-                                .maneuverBackgroundColor(whiteRes)
-                                .subManeuverBackgroundColor(whiteRes)
-                                .upcomingManeuverBackgroundColor(whiteRes)
-                                .stepDistanceTextAppearance(blackStyle)
-                                .primaryManeuverOptions(ManeuverPrimaryOptions.Builder().textAppearance(blackStyle).build())
-                                .secondaryManeuverOptions(ManeuverSecondaryOptions.Builder().textAppearance(blackStyle).build())
-                                .subManeuverOptions(ManeuverSubOptions.Builder().textAppearance(blackStyle).build())
-                                .build()
-
-                            view.updateManeuverViewOptions(options)
-                            view.post {
-                                val black = android.graphics.Color.BLACK
-                                fun tintBlack(v: View) {
-                                    if (v is ImageView) v.setColorFilter(black)
-                                    else if (v is TextView) v.setTextColor(black)
-                                    else if (v is ViewGroup) (0 until v.childCount).forEach { tintBlack(v.getChildAt(it)) }
-                                }
-                                tintBlack(view)
+                AndroidView(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight(),
+                    factory = { ctx ->
+                        val wrappedContext = ContextThemeWrapper(ctx, R.style.Theme_HelloWorld)
+                        val view = LayoutInflater.from(wrappedContext).inflate(R.layout.view_maneuver, null, false) as MapboxManeuverView
+                        val whiteRes = android.R.color.white
+                        val blackStyle = R.style.ManeuverTextAppearance
+                        val options = ManeuverViewOptions.Builder()
+                            .maneuverBackgroundColor(whiteRes)
+                            .subManeuverBackgroundColor(whiteRes)
+                            .upcomingManeuverBackgroundColor(whiteRes)
+                            .stepDistanceTextAppearance(blackStyle)
+                            .primaryManeuverOptions(ManeuverPrimaryOptions.Builder().textAppearance(blackStyle).build())
+                            .secondaryManeuverOptions(ManeuverSecondaryOptions.Builder().textAppearance(blackStyle).build())
+                            .subManeuverOptions(ManeuverSubOptions.Builder().textAppearance(blackStyle).build())
+                            .build()
+                        view.updateManeuverViewOptions(options)
+                        view.post {
+                            val black = android.graphics.Color.BLACK
+                            fun tintBlack(v: View) {
+                                if (v is ImageView) v.setColorFilter(black)
+                                else if (v is TextView) v.setTextColor(black)
+                                else if (v is ViewGroup) (0 until v.childCount).forEach { tintBlack(v.getChildAt(it)) }
                             }
-                            view
-                        },
-                        update = { view ->
-                            maneuversResult?.let { result ->
-                                view.renderManeuvers(result)
-                                val list = result.value
-                                view.visibility = if (list != null && list.isNotEmpty()) View.VISIBLE else View.GONE
-
-                                view.post {
-                                    val black = android.graphics.Color.BLACK
-                                    fun tintBlack(v: View) {
-                                        if (v is ImageView) v.setColorFilter(black)
-                                        else if (v is TextView) v.setTextColor(black)
-                                        else if (v is ViewGroup) (0 until v.childCount).forEach { tintBlack(v.getChildAt(it)) }
-                                    }
-                                    tintBlack(view)
-                                }
-                            } ?: run {
-                                view.visibility = View.GONE
-                            }
+                            tintBlack(view)
                         }
-                    )
-                } else if (screenState == ScreenState.ROUTE_PREVIEW || isLoading || screenState == ScreenState.POI_OVERVIEW) {
-                    IconButton(onClick = {
-                        when(screenState) {
-                            ScreenState.POI_OVERVIEW -> navController.popBackStack()
-                            ScreenState.ROUTE_PREVIEW -> {
-                                clearRouteAndReturnToOverview()
-                            }
-                            else -> {null}
-                        }
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        view
+                    },
+                    update = { view ->
+                        maneuversResult?.let { result ->
+                            view.renderManeuvers(result)
+                            val list = result.value
+                            view.visibility = if (list != null && list.isNotEmpty()) View.VISIBLE else View.GONE
+                        } ?: run { view.visibility = View.GONE }
                     }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    if (screenState == ScreenState.ROUTE_PREVIEW || isLoading) {
-                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 4.dp)) {
-                                Icon(Icons.Outlined.RadioButtonUnchecked, "Origin", tint = MaterialTheme.colorScheme.onSurface)
-                                VerticalDottedLine(modifier = Modifier.width(2.dp).height(32.dp))
-                                Icon(Icons.Outlined.Place, "Destination", tint = MaterialTheme.colorScheme.onSurface)
-                            }
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(end = 16.dp)
-                            ) {
-                                Text(originLabel, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                                HorizontalDividerMMD(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 16.dp))
-                                Text(poiName, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                            }
-                        }
-                    } else {
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(end = 16.dp),
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            if (isPlace) {
-                                Text(
-                                    text = poiName,
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                Text(
-                                    text = poiAddress,
-                                    fontSize = 16.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-
-                                currentUserLocation?.let { loc ->
-                                    val results = FloatArray(1)
-                                    android.location.Location.distanceBetween(
-                                        loc.latitude,
-                                        loc.longitude,
-                                        poiLat,
-                                        poiLng,
-                                        results
-                                    )
-                                    val distanceInMeters = results[0]
-
-                                    val distanceString = if (distanceUnit == DistanceUnit.IMPERIAL) {
-                                        val miles = distanceInMeters * 0.000621371
-                                        if (miles >= 0.1) {
-                                            "%.1f mi".format(miles)
-                                        } else {
-                                            "%.0f ft".format(distanceInMeters * 3.28084)
-                                        }
-                                    } else {
-                                        if (distanceInMeters >= 1000) {
-                                            "%.1f km".format(distanceInMeters / 1000)
-                                        } else {
-                                            "%.0f m".format(distanceInMeters)
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                    Text(
-                                        text = distanceString,
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-
-                            } else {
-                                Text(
-                                    text = poiName,
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-
-                                currentUserLocation?.let { loc ->
-                                    val results = FloatArray(1)
-                                    android.location.Location.distanceBetween(
-                                        loc.latitude,
-                                        loc.longitude,
-                                        poiLat,
-                                        poiLng,
-                                        results
-                                    )
-                                    val distanceInMeters = results[0]
-
-                                    val distanceString = if (distanceUnit == DistanceUnit.IMPERIAL) {
-                                        val miles = distanceInMeters * 0.000621371
-                                        if (miles >= 0.1) {
-                                            "%.1f mi".format(miles)
-                                        } else {
-                                            "%.0f ft".format(distanceInMeters * 3.28084)
-                                        }
-                                    } else {
-                                        if (distanceInMeters >= 1000) {
-                                            "%.1f km".format(distanceInMeters / 1000)
-                                        } else {
-                                            "%.0f m".format(distanceInMeters)
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                    Text(
-                                        text = distanceString,
-                                        fontSize = 14.sp,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                )
             }
-
-            HorizontalDividerMMD(
-                thickness = 3.dp,
-                color = MaterialTheme.colorScheme.outlineVariant,
-                modifier = Modifier
-                    .padding(top = if (screenState == ScreenState.NAVIGATING) 0.dp else 16.dp)
-            )
         }
 
-        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            MapboxMap(modifier = Modifier.fillMaxSize()) {
+        val mapModifier = if (isPipMode) {
+            Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .fillMaxWidth(0.64f)
+                .zIndex(1f)
+        } else {
+            Modifier
+                .fillMaxSize()
+                .padding(top = topBarHeight, bottom = bottomBarHeight)
+                .zIndex(0f)
+        }
+
+        Box(modifier = mapModifier) {
+            MapboxMap(
+                modifier = Modifier.fillMaxSize(),
+                compass = { },
+                scaleBar = { },
+                logo = {
+                    if (!isPipMode) {
+                        Logo(modifier = Modifier.align(Alignment.BottomStart))
+                    }
+                },
+                attribution = {
+                    if (!isPipMode) {
+                        Attribution(modifier = Modifier.align(Alignment.BottomEnd))
+                    }
+                }
+            ) {
                 MapEffect(Unit) { mapViewInstance ->
                     mapView = mapViewInstance
                     val styleUri = mapViewInstance.context.getString(R.string.mapbox_eink_style_uri)
@@ -806,7 +668,6 @@ fun NavigationScreen(
                         if (screenState == ScreenState.POI_OVERVIEW) {
                             setCamera(CameraOptions.Builder().center(Point.fromLngLat(poiLng, poiLat)).zoom(15.0).build())
                         }
-
                         loadStyleUri(styleUri) { style ->
                             isStyleLoaded = true
                             style.styleLayers.forEach { layer ->
@@ -835,171 +696,339 @@ fun NavigationScreen(
             }
         }
 
-        if (screenState !== ScreenState.NAVIGATING) {
-            Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-
-                    HorizontalDividerMMD(thickness = 3.dp, color = MaterialTheme.colorScheme.outlineVariant)
-
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        ButtonMMD(
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = {
-                                when (screenState) {
-                                    ScreenState.POI_OVERVIEW -> fetchRoute()
-                                    ScreenState.ROUTE_PREVIEW -> {
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                            val hasPermission = ContextCompat.checkSelfPermission(
-                                                context,
-                                                Manifest.permission.POST_NOTIFICATIONS
-                                            ) == PackageManager.PERMISSION_GRANTED
-
-                                            if (!hasPermission) {
-                                                postNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                            } else {
-                                                startNavigation()
-                                            }
-                                        } else {
-                                            startNavigation()
-                                        }
-                                    } else -> {null}
-                                }
-                            },
-                            enabled = !isLoading && errorMessage == null,
-                            contentPadding = PaddingValues(16.dp),
-                        ) {
-                            Text(
-                                text = when (screenState) {
-                                    ScreenState.POI_OVERVIEW -> "Get Directions"
-                                    ScreenState.ROUTE_PREVIEW -> "Start Navigation"
-                                    else -> {""}
-                                }
-                            )
-                        }
-
-                        if (errorMessage != null) {
-                            Text(errorMessage!!, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
-                        }
-                    }
-                }
-            }
-        } else if (screenState == ScreenState.NAVIGATING) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surface
-            ) {
-                HorizontalDividerMMD(thickness = 3.dp, color = MaterialTheme.colorScheme.outlineVariant)
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = routeTime,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = routeDistance,
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "•",
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = routeEta,
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-
-                    IconButton(
-                        modifier = Modifier.size(48.dp),
-                        onClick = {
-                            stopNavigationSession()
-                        }
-                    ) {
-                        Icon(
-                            Icons.Outlined.Clear,
-                            "End Navigation",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    if (showOverlayPermissionSheet) {
-        ModalBottomSheetMMD(
-            onDismissRequest = { showOverlayPermissionSheet = false },
-            sheetState = overlaySheetState,
-        ) {
+        if (!isPipMode) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp)
+                    .zIndex(2f)
             ) {
-                Text(
-                    text = "Permission Required",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { coordinates ->
+                            topBarHeight = with(density) { coordinates.size.height.toDp() }
+                        },
+                    color = MaterialTheme.colorScheme.surface
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = if (screenState == ScreenState.NAVIGATING) 0.dp else 16.dp)
+                        ) {
+                            if (screenState == ScreenState.NAVIGATING) {
+                                AndroidView(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    factory = { ctx ->
+                                        val wrappedContext = ContextThemeWrapper(ctx, R.style.Theme_HelloWorld)
+                                        val view = LayoutInflater.from(wrappedContext).inflate(R.layout.view_maneuver, null, false) as MapboxManeuverView
+                                        val whiteRes = android.R.color.white
+                                        val blackStyle = R.style.ManeuverTextAppearance
 
-                Spacer(modifier = Modifier.height(16.dp))
+                                        val options = ManeuverViewOptions.Builder()
+                                            .maneuverBackgroundColor(whiteRes)
+                                            .subManeuverBackgroundColor(whiteRes)
+                                            .upcomingManeuverBackgroundColor(whiteRes)
+                                            .stepDistanceTextAppearance(blackStyle)
+                                            .primaryManeuverOptions(ManeuverPrimaryOptions.Builder().textAppearance(blackStyle).build())
+                                            .secondaryManeuverOptions(ManeuverSecondaryOptions.Builder().textAppearance(blackStyle).build())
+                                            .subManeuverOptions(ManeuverSubOptions.Builder().textAppearance(blackStyle).build())
+                                            .build()
 
-                Text(
-                    text = "So you don't miss a turn while changing a song or taking a call, " +
-                            "please enable this permission so Directory can display the next " +
-                            "Maneuver over other apps.",
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(bottom = 24.dp)
-                )
+                                        view.updateManeuverViewOptions(options)
+                                        view.post {
+                                            val black = android.graphics.Color.BLACK
+                                            fun tintBlack(v: View) {
+                                                if (v is ImageView) v.setColorFilter(black)
+                                                else if (v is TextView) v.setTextColor(black)
+                                                else if (v is ViewGroup) (0 until v.childCount).forEach { tintBlack(v.getChildAt(it)) }
+                                            }
+                                            tintBlack(view)
+                                        }
+                                        view
+                                    },
+                                    update = { view ->
+                                        maneuversResult?.let { result ->
+                                            view.renderManeuvers(result)
+                                            val list = result.value
+                                            view.visibility = if (list != null && list.isNotEmpty()) View.VISIBLE else View.GONE
+                                            view.post {
+                                                val black = android.graphics.Color.BLACK
+                                                fun tintBlack(v: View) {
+                                                    if (v is ImageView) v.setColorFilter(black)
+                                                    else if (v is TextView) v.setTextColor(black)
+                                                    else if (v is ViewGroup) (0 until v.childCount).forEach { tintBlack(v.getChildAt(it)) }
+                                                }
+                                                tintBlack(view)
+                                            }
+                                        } ?: run {
+                                            view.visibility = View.GONE
+                                        }
+                                    }
+                                )
+                            } else if (screenState == ScreenState.ROUTE_PREVIEW || isLoading || screenState == ScreenState.POI_OVERVIEW) {
+                                IconButton(onClick = {
+                                    when(screenState) {
+                                        ScreenState.POI_OVERVIEW -> navController.popBackStack()
+                                        ScreenState.ROUTE_PREVIEW -> {
+                                            clearRouteAndReturnToOverview()
+                                        }
+                                        else -> {null}
+                                    }
+                                }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                                }
 
-                ButtonMMD(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        val intent = Intent(
-                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:${context.packageName}")
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                if (screenState == ScreenState.ROUTE_PREVIEW || isLoading) {
+                                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 4.dp)) {
+                                            Icon(Icons.Outlined.RadioButtonUnchecked, "Origin", tint = MaterialTheme.colorScheme.onSurface)
+                                            VerticalDottedLine(modifier = Modifier.width(2.dp).height(32.dp))
+                                            Icon(Icons.Outlined.Place, "Destination", tint = MaterialTheme.colorScheme.onSurface)
+                                        }
+
+                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                        Column(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .padding(end = 16.dp)
+                                        ) {
+                                            Text(originLabel, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                            HorizontalDividerMMD(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 16.dp))
+                                            Text(poiName, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                        }
+                                    }
+                                } else {
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(end = 16.dp),
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        if (isPlace) {
+                                            Text(
+                                                text = poiName,
+                                                fontSize = 20.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            Text(
+                                                text = poiAddress,
+                                                fontSize = 16.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+
+                                            currentUserLocation?.let { loc ->
+                                                val results = FloatArray(1)
+                                                android.location.Location.distanceBetween(
+                                                    loc.latitude,
+                                                    loc.longitude,
+                                                    poiLat,
+                                                    poiLng,
+                                                    results
+                                                )
+                                                val distanceInMeters = results[0]
+
+                                                val distanceString = if (distanceUnit == DistanceUnit.IMPERIAL) {
+                                                    val miles = distanceInMeters * 0.000621371
+                                                    if (miles >= 0.1) {
+                                                        "%.1f mi".format(miles)
+                                                    } else {
+                                                        "%.0f ft".format(distanceInMeters * 3.28084)
+                                                    }
+                                                } else {
+                                                    if (distanceInMeters >= 1000) {
+                                                        "%.1f km".format(distanceInMeters / 1000)
+                                                    } else {
+                                                        "%.0f m".format(distanceInMeters)
+                                                    }
+                                                }
+
+                                                Spacer(modifier = Modifier.height(8.dp))
+
+                                                Text(
+                                                    text = distanceString,
+                                                    fontSize = 16.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+
+                                        } else {
+                                            Text(
+                                                text = poiName,
+                                                fontSize = 24.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+
+                                            currentUserLocation?.let { loc ->
+                                                val results = FloatArray(1)
+                                                android.location.Location.distanceBetween(
+                                                    loc.latitude,
+                                                    loc.longitude,
+                                                    poiLat,
+                                                    poiLng,
+                                                    results
+                                                )
+                                                val distanceInMeters = results[0]
+
+                                                val distanceString = if (distanceUnit == DistanceUnit.IMPERIAL) {
+                                                    val miles = distanceInMeters * 0.000621371
+                                                    if (miles >= 0.1) {
+                                                        "%.1f mi".format(miles)
+                                                    } else {
+                                                        "%.0f ft".format(distanceInMeters * 3.28084)
+                                                    }
+                                                } else {
+                                                    if (distanceInMeters >= 1000) {
+                                                        "%.1f km".format(distanceInMeters / 1000)
+                                                    } else {
+                                                        "%.0f m".format(distanceInMeters)
+                                                    }
+                                                }
+
+                                                Spacer(modifier = Modifier.height(8.dp))
+
+                                                Text(
+                                                    text = distanceString,
+                                                    fontSize = 14.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalDividerMMD(
+                            thickness = 3.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant,
+                            modifier = Modifier
+                                .padding(top = if (screenState == ScreenState.NAVIGATING) 0.dp else 16.dp)
                         )
-                        context.startActivity(intent)
-                    },
-                    contentPadding = PaddingValues(16.dp)
-                ) {
-                    Text("Open Settings")
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.fillMaxWidth().weight(1f))
 
-                OutlinedButtonMMD(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { showOverlayPermissionSheet = false },
-                    contentPadding = PaddingValues(16.dp)
-                ) {
-                    Text(
-                        text = "Cancel",
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                if (screenState !== ScreenState.NAVIGATING) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onGloballyPositioned { coordinates ->
+                                bottomBarHeight = with(density) { coordinates.size.height.toDp() }
+                            },
+                        color = MaterialTheme.colorScheme.surface
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+
+                            HorizontalDividerMMD(thickness = 3.dp, color = MaterialTheme.colorScheme.outlineVariant)
+
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                ButtonMMD(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = {
+                                        when (screenState) {
+                                            ScreenState.POI_OVERVIEW -> fetchRoute()
+                                            ScreenState.ROUTE_PREVIEW -> {
+                                                startNavigation()
+                                            } else -> {null}
+                                        }
+                                    },
+                                    enabled = !isLoading && errorMessage == null,
+                                    contentPadding = PaddingValues(16.dp),
+                                ) {
+                                    Text(
+                                        text = when (screenState) {
+                                            ScreenState.POI_OVERVIEW -> "Get Directions"
+                                            ScreenState.ROUTE_PREVIEW -> "Start Navigation"
+                                            else -> {""}
+                                        }
+                                    )
+                                }
+
+                                if (errorMessage != null) {
+                                    Text(errorMessage!!, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+                                }
+                            }
+                        }
+                    }
+                } else if (screenState == ScreenState.NAVIGATING) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onGloballyPositioned { coordinates ->
+                                bottomBarHeight = with(density) { coordinates.size.height.toDp() }
+                            },
+                        color = MaterialTheme.colorScheme.surface
+                    ) {
+                        Column {
+                            HorizontalDividerMMD(thickness = 3.dp, color = MaterialTheme.colorScheme.outlineVariant)
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = routeTime,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = routeDistance,
+                                            fontSize = 14.sp,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "•",
+                                            fontSize = 14.sp,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = routeEta,
+                                            fontSize = 14.sp,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+
+                                IconButton(
+                                    modifier = Modifier.size(48.dp),
+                                    onClick = {
+                                        stopNavigationSession()
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.Clear,
+                                        "End Navigation",
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
@@ -1035,7 +1064,7 @@ fun rememberLocationPuckBitmap(): Bitmap {
     return remember(context) {
         val density = context.resources.displayMetrics.density
         val sizePx = (48 * density).toInt()
-        val bitmap = createBitmap(sizePx, sizePx)
+        val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
 
         val canvas = AndroidCanvas(bitmap)
 
@@ -1085,7 +1114,7 @@ fun rememberMarkerBitmap(): Bitmap? {
     return remember(context) {
         val width = 64
         val height = 76
-        val bitmap = createBitmap(width, height)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = AndroidCanvas(bitmap)
 
         val fillPaint = Paint().apply {
