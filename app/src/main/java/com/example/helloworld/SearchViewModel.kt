@@ -42,12 +42,9 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     private var locationDeferred: Deferred<Pair<Double, Double>>? = null
 
     init {
-        // Warm up location cache once when the ViewModel is created.
         prefetchLocation()
 
-        // Observe preference changes to automatically invalidate the location cache.
         viewModelScope.launch {
-            // Any change in either location-related preference will trigger a cache invalidation.
             userPreferencesRepository.useDeviceLocation
                 .combine(userPreferencesRepository.defaultLocation) { _, _ -> }
                 .collect {
@@ -55,7 +52,6 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 }
         }
 
-        // Observe search provider changes to switch backends dynamically.
         viewModelScope.launch {
             userPreferencesRepository.searchProvider.collect { provider ->
                 currentBackend = when (provider) {
@@ -72,7 +68,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         if (query.isNotBlank()) {
             _isLoading.value = true
             searchJob = viewModelScope.launch {
-                delay(300L) // Debounce for 300 milliseconds
+                delay(300L)
                 try {
                     val locationStart = System.currentTimeMillis()
                     val (lat, lon) = getOrFetchLocation()
@@ -91,7 +87,6 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                     Log.e("SearchViewModel", "Location permission not granted", e)
                     _searchResults.value = emptyList()
                 } catch (e: CancellationException) {
-                    // Expected when a newer query cancels the previous one
                     Log.d("SearchViewModel", "Search cancelled", e)
                 } catch (e: Exception) {
                     Log.e("SearchViewModel", "Search failed", e)
@@ -130,7 +125,6 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 if (lat != null && lon != null && !(lat == 0.0 && lon == 0.0)) {
                     lat to lon
                 } else {
-                    // Fallback to default location if configured.
                     val defaultLocation = userPreferencesRepository.defaultLocation.first()
                     if (!defaultLocation.isNullOrBlank()) {
                         val provider = userPreferencesRepository.searchProvider.first()
@@ -160,12 +154,6 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                     0.0 to 0.0
                 }
             }
-            if (location.first == 0.0 && location.second == 0.0) {
-                Log.w(
-                    "SearchViewModel",
-                    "Using fallback location (0,0); no valid device or default location available"
-                )
-            }
             cachedLocation = location
             location
         }
@@ -188,4 +176,5 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
     }
+
 }

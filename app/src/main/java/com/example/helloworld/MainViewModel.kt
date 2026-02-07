@@ -22,14 +22,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    // Expose the key required for the currently selected backend
     private val apiKeyFlow: Flow<String?> = combine(
         userPreferencesRepository.searchProvider,
         userPreferencesRepository.googleApiKey
     ) { provider, googleKey ->
         when (provider) {
             SearchProvider.GOOGLE_PLACES -> googleKey
-            // HERE key is also provided via BuildConfig from local.properties
             SearchProvider.HERE -> BuildConfig.HERE_API_KEY
         }
     }

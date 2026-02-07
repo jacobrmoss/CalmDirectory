@@ -79,9 +79,8 @@ fun SearchScreen(
             }
 
             if (poi != searchResults.last()) {
-                HorizontalDividerMMD(
+                DashedDivider(
                     modifier = Modifier.padding(start = 16.dp),
-                    thickness = 1.dp
                 )
             }
         }

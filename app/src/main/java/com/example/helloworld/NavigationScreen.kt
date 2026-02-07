@@ -21,6 +21,7 @@ import android.widget.TextView
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,9 +36,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.Directions
+import androidx.compose.material.icons.outlined.DirectionsBike
+import androidx.compose.material.icons.outlined.DirectionsCar
+import androidx.compose.material.icons.outlined.DirectionsWalk
+import androidx.compose.material.icons.outlined.LocationSearching
+import androidx.compose.material.icons.outlined.Navigation
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -75,6 +83,7 @@ import androidx.navigation.NavController
 import com.calmapps.directory.R
 import com.example.helloworld.data.DistanceUnit
 import com.example.helloworld.data.UserPreferencesRepository
+import com.mapbox.api.directions.v5.DirectionsCriteria
 import com.mapbox.api.directions.v5.models.RouteOptions
 import com.mapbox.bindgen.Expected
 import com.mapbox.bindgen.Value
@@ -133,6 +142,7 @@ import com.mapbox.navigation.voice.model.SpeechAnnouncement
 import com.mapbox.navigation.voice.model.SpeechError
 import com.mapbox.navigation.voice.model.SpeechValue
 import com.mudita.mmd.components.buttons.ButtonMMD
+import com.mudita.mmd.components.buttons.OutlinedButtonMMD
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -186,6 +196,8 @@ fun NavigationScreen(
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var originLabel by remember { mutableStateOf("Locating...") }
+    var transportMode by remember { mutableStateOf(DirectionsCriteria.PROFILE_DRIVING_TRAFFIC) }
+
     val markerBitmap = rememberMarkerBitmap()
     val puckBitmap = rememberLocationPuckBitmap()
 
@@ -325,7 +337,7 @@ fun NavigationScreen(
             errorMessage = null
 
             try {
-                val bestLocation = locationService.getBestLocationOrNull()
+                val bestLocation = locationService.getCurrentLocation()
                 val originPoint = if (bestLocation != null) {
                     originLabel = "Current location"
                     Point.fromLngLat(bestLocation.longitude, bestLocation.latitude)
@@ -345,6 +357,7 @@ fun NavigationScreen(
                 val routeOptions = RouteOptions.builder()
                     .applyDefaultNavigationOptions()
                     .applyLanguageAndVoiceUnitOptions(context)
+                    .profile(transportMode)
                     .coordinatesList(listOf(originPoint, destinationPoint))
                     .build()
 
@@ -588,7 +601,7 @@ fun NavigationScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(ComposeColor.White),
+                    .background(ComposeColor.Black),
                 contentAlignment = Alignment.Center
             ) {
                 AndroidView(
@@ -598,26 +611,26 @@ fun NavigationScreen(
                     factory = { ctx ->
                         val wrappedContext = ContextThemeWrapper(ctx, R.style.Theme_HelloWorld)
                         val view = LayoutInflater.from(wrappedContext).inflate(R.layout.view_maneuver, null, false) as MapboxManeuverView
-                        val whiteRes = android.R.color.white
-                        val blackStyle = R.style.ManeuverTextAppearance
+                        val blackRes = android.R.color.black
+                        val whiteStyle = R.style.ManeuverTextAppearance_Overlay
                         val options = ManeuverViewOptions.Builder()
-                            .maneuverBackgroundColor(whiteRes)
-                            .subManeuverBackgroundColor(whiteRes)
-                            .upcomingManeuverBackgroundColor(whiteRes)
-                            .stepDistanceTextAppearance(blackStyle)
-                            .primaryManeuverOptions(ManeuverPrimaryOptions.Builder().textAppearance(blackStyle).build())
-                            .secondaryManeuverOptions(ManeuverSecondaryOptions.Builder().textAppearance(blackStyle).build())
-                            .subManeuverOptions(ManeuverSubOptions.Builder().textAppearance(blackStyle).build())
+                            .maneuverBackgroundColor(blackRes)
+                            .subManeuverBackgroundColor(blackRes)
+                            .upcomingManeuverBackgroundColor(blackRes)
+                            .stepDistanceTextAppearance(whiteStyle)
+                            .primaryManeuverOptions(ManeuverPrimaryOptions.Builder().textAppearance(whiteStyle).build())
+                            .secondaryManeuverOptions(ManeuverSecondaryOptions.Builder().textAppearance(whiteStyle).build())
+                            .subManeuverOptions(ManeuverSubOptions.Builder().textAppearance(whiteStyle).build())
                             .build()
                         view.updateManeuverViewOptions(options)
                         view.post {
-                            val black = android.graphics.Color.BLACK
-                            fun tintBlack(v: View) {
-                                if (v is ImageView) v.setColorFilter(black)
-                                else if (v is TextView) v.setTextColor(black)
-                                else if (v is ViewGroup) (0 until v.childCount).forEach { tintBlack(v.getChildAt(it)) }
+                            val white = android.graphics.Color.WHITE
+                            fun tintWhite(v: View) {
+                                if (v is ImageView) v.setColorFilter(white)
+                                else if (v is TextView) v.setTextColor(white)
+                                else if (v is ViewGroup) (0 until v.childCount).forEach { tintWhite(v.getChildAt(it)) }
                             }
-                            tintBlack(view)
+                            tintWhite(view)
                         }
                         view
                     },
@@ -636,7 +649,7 @@ fun NavigationScreen(
             Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .fillMaxWidth(0.64f)
+                .fillMaxWidth(0f)
                 .zIndex(1f)
         } else {
             Modifier
@@ -935,8 +948,95 @@ fun NavigationScreen(
 
                             HorizontalDividerMMD(thickness = 3.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
+                            if (screenState == ScreenState.ROUTE_PREVIEW) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 16.dp, start = 16.dp, end = 16.dp),
+                                    horizontalArrangement = Arrangement.SpaceEvenly
+                                ) {
+                                    val isDriving = transportMode == DirectionsCriteria.PROFILE_DRIVING_TRAFFIC
+                                    IconButton(
+                                        onClick = {
+                                            transportMode = DirectionsCriteria.PROFILE_DRIVING_TRAFFIC
+                                            fetchRoute()
+                                        },
+                                        modifier = Modifier
+                                            .size(56.dp)
+                                            .background(
+                                                color = if (isDriving) MaterialTheme.colorScheme.onSurface else ComposeColor.Transparent,
+                                                shape = CircleShape
+                                            )
+                                            .border(
+                                                width = 2.dp,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                shape = CircleShape
+                                            )
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.DirectionsCar,
+                                            contentDescription = "Driving",
+                                            tint = if (isDriving) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    }
+
+                                    val isCycling = transportMode == DirectionsCriteria.PROFILE_CYCLING
+                                    IconButton(
+                                        onClick = {
+                                            transportMode = DirectionsCriteria.PROFILE_CYCLING
+                                            fetchRoute()
+                                        },
+                                        modifier = Modifier
+                                            .size(56.dp)
+                                            .background(
+                                                color = if (isCycling) MaterialTheme.colorScheme.onSurface else ComposeColor.Transparent,
+                                                shape = CircleShape
+                                            )
+                                            .border(
+                                                width = 2.dp,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                shape = CircleShape
+                                            )
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.DirectionsBike,
+                                            contentDescription = "Cycling",
+                                            tint = if (isCycling) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    }
+
+                                    val isWalking = transportMode == DirectionsCriteria.PROFILE_WALKING
+                                    IconButton(
+                                        onClick = {
+                                            transportMode = DirectionsCriteria.PROFILE_WALKING
+                                            fetchRoute()
+                                        },
+                                        modifier = Modifier
+                                            .size(56.dp)
+                                            .background(
+                                                color = if (isWalking) MaterialTheme.colorScheme.onSurface else ComposeColor.Transparent,
+                                                shape = CircleShape
+                                            )
+                                            .border(
+                                                width = 2.dp,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                shape = CircleShape
+                                            )
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.DirectionsWalk,
+                                            contentDescription = "Walking",
+                                            tint = if (isWalking) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    }
+                                }
+                            }
+
                             Column(modifier = Modifier.padding(16.dp)) {
-                                ButtonMMD(
+                                OutlinedButtonMMD(
                                     modifier = Modifier.fillMaxWidth(),
                                     onClick = {
                                         when (screenState) {
@@ -949,12 +1049,30 @@ fun NavigationScreen(
                                     enabled = !isLoading && errorMessage == null,
                                     contentPadding = PaddingValues(16.dp),
                                 ) {
+                                    Icon(
+                                        imageVector = if (isLoading) {
+                                            Icons.Outlined.LocationSearching
+                                        } else {
+                                            Icons.Outlined.Directions
+                                        },
+                                        "End Navigation",
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .padding(end = 8.dp)
+                                    )
+
                                     Text(
-                                        text = when (screenState) {
-                                            ScreenState.POI_OVERVIEW -> "Get Directions"
-                                            ScreenState.ROUTE_PREVIEW -> "Start Navigation"
-                                            else -> {""}
-                                        }
+                                        text = if (isLoading) {
+                                            "Getting your location..."
+                                        } else {
+                                            when (screenState) {
+                                                ScreenState.POI_OVERVIEW -> "Get Directions"
+                                                ScreenState.ROUTE_PREVIEW -> "Start Navigation"
+                                                else -> {""}
+                                            }
+                                        },
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
 

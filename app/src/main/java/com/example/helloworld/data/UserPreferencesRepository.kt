@@ -2,14 +2,13 @@ package com.example.helloworld.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
@@ -18,23 +17,24 @@ enum class DistanceUnit {
     METRIC
 }
 
+@Serializable
+data class QuickLocation(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val label: String,
+    val address: String
+)
+
 class UserPreferencesRepository(
     private val context: Context
 ) {
     val googleApiKey: Flow<String?> = context.dataStore.data
-        .map { preferences ->
-            preferences[API_KEY]
-        }
+        .map { preferences -> preferences[API_KEY] }
 
     val useDeviceLocation: Flow<Boolean> = context.dataStore.data
-        .map { preferences ->
-            preferences[USE_DEVICE_LOCATION] ?: false
-        }
+        .map { preferences -> preferences[USE_DEVICE_LOCATION] ?: false }
 
     val defaultLocation: Flow<String?> = context.dataStore.data
-        .map { preferences ->
-            preferences[DEFAULT_LOCATION]
-        }
+        .map { preferences -> preferences[DEFAULT_LOCATION] }
 
     val mapApp: Flow<MapApp> = context.dataStore.data
         .map { preferences ->
@@ -48,9 +48,7 @@ class UserPreferencesRepository(
         }
 
     val searchRadius: Flow<Int> = context.dataStore.data
-        .map { preferences ->
-            preferences[SEARCH_RADIUS] ?: 10
-        }
+        .map { preferences -> preferences[SEARCH_RADIUS] ?: 10 }
 
     val distanceUnit: Flow<DistanceUnit> = context.dataStore.data
         .map { preferences ->
@@ -66,46 +64,53 @@ class UserPreferencesRepository(
             }
         }
 
-    suspend fun saveGoogleApiKey(apiKey: String) {
-        context.dataStore.edit { settings ->
-            settings[API_KEY] = apiKey
+    private val QUICK_LOCATIONS = stringPreferencesKey("quick_locations")
+
+    val quickLocations: Flow<List<QuickLocation>> = context.dataStore.data
+        .map { preferences ->
+            val json = preferences[QUICK_LOCATIONS] ?: "[]"
+            try {
+                Json.decodeFromString<List<QuickLocation>>(json)
+            } catch (e: Exception) {
+                emptyList()
+            }
         }
+
+    suspend fun addQuickLocation(label: String, address: String) {
+        context.dataStore.edit { settings ->
+            val currentJson = settings[QUICK_LOCATIONS] ?: "[]"
+            val currentList: MutableList<QuickLocation> = try {
+                Json.decodeFromString<List<QuickLocation>>(currentJson).toMutableList()
+            } catch (e: Exception) {
+                mutableListOf()
+            }
+            currentList.add(QuickLocation(label = label, address = address))
+            settings[QUICK_LOCATIONS] = Json.encodeToString(currentList)
+        }
+    }
+
+    suspend fun saveGoogleApiKey(apiKey: String) {
+        context.dataStore.edit { settings -> settings[API_KEY] = apiKey }
     }
 
     suspend fun saveUseDeviceLocation(useDeviceLocation: Boolean) {
-        context.dataStore.edit { settings ->
-            settings[USE_DEVICE_LOCATION] = useDeviceLocation
-        }
+        context.dataStore.edit { settings -> settings[USE_DEVICE_LOCATION] = useDeviceLocation }
     }
 
     suspend fun saveDefaultLocation(defaultLocation: String) {
-        context.dataStore.edit { settings ->
-            settings[DEFAULT_LOCATION] = defaultLocation
-        }
-    }
-
-    suspend fun saveMapApp(mapApp: MapApp) {
-        context.dataStore.edit { settings ->
-            settings[MAP_APP] = mapApp.name
-        }
+        context.dataStore.edit { settings -> settings[DEFAULT_LOCATION] = defaultLocation }
     }
 
     suspend fun saveSearchRadius(radius: Int) {
-        context.dataStore.edit { settings ->
-            settings[SEARCH_RADIUS] = radius
-        }
+        context.dataStore.edit { settings -> settings[SEARCH_RADIUS] = radius }
     }
 
     suspend fun saveSearchProvider(provider: SearchProvider) {
-        context.dataStore.edit { settings ->
-            settings[SEARCH_PROVIDER] = provider.name
-        }
+        context.dataStore.edit { settings -> settings[SEARCH_PROVIDER] = provider.name }
     }
 
     suspend fun saveDistanceUnit(unit: DistanceUnit) {
-        context.dataStore.edit { settings ->
-            settings[DISTANCE_UNIT] = unit.name
-        }
+        context.dataStore.edit { settings -> settings[DISTANCE_UNIT] = unit.name }
     }
 
     private companion object {
