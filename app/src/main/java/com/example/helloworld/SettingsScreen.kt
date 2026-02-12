@@ -15,10 +15,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.Clear
+import androidx.compose.material.icons.sharp.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -73,6 +75,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val userPreferencesRepository = remember { UserPreferencesRepository(context) }
+    val offlineManager = remember { OfflineMapManager(context) }
 
     val googleApiKey by userPreferencesRepository.googleApiKey.collectAsState(initial = "")
     var newGoogleApiKey by remember(googleApiKey) { mutableStateOf(googleApiKey ?: "") }
@@ -91,6 +94,9 @@ fun SettingsScreen(
 
     val distanceUnit by userPreferencesRepository.distanceUnit.collectAsState(initial = DistanceUnit.IMPERIAL)
     val quickLocations by userPreferencesRepository.quickLocations.collectAsState(initial = emptyList())
+
+    var offlineRegions by remember { mutableStateOf<List<OfflineRegionItem>>(emptyList()) }
+    var refreshRegionsTrigger by remember { mutableStateOf(0) }
 
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostStateMMD() }
@@ -119,6 +125,14 @@ fun SettingsScreen(
 
     LaunchedEffect(Unit) {
         searchProvider = userPreferencesRepository.searchProvider.first()
+    }
+
+    LaunchedEffect(selectedTabIndex, refreshRegionsTrigger) {
+        if (selectedTabIndex == 1) {
+            offlineManager.getOfflineRegions().collect { regions ->
+                offlineRegions = regions
+            }
+        }
     }
 
     LaunchedEffect(scrollToLocationSettings) {
@@ -163,7 +177,7 @@ fun SettingsScreen(
 
             when (selectedTabIndex) {
                 0 -> {
-                    LazyColumnMMD(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(modifier = Modifier.fillMaxSize().weight(1f)) {
                         item { Spacer(modifier = Modifier.height(16.dp)) }
 
                         item {
@@ -390,7 +404,7 @@ fun SettingsScreen(
                 }
 
                 1 -> {
-                    LazyColumnMMD(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(modifier = Modifier.fillMaxSize().weight(1f)) {
                         item { Spacer(modifier = Modifier.height(16.dp)) }
 
                         item {
@@ -457,7 +471,7 @@ fun SettingsScreen(
                                             }
                                             IconButton(onClick = {
                                                 coroutineScope.launch {
-                                                    // TO-DO: Implementation for removing a specific quick location
+                                                    // Implementation for removing a specific quick location
                                                 }
                                             }) {
                                                 Icon(Icons.Sharp.Clear, "Remove Location")
@@ -473,9 +487,61 @@ fun SettingsScreen(
                                 ) {
                                     Text("Add Quick Location")
                                 }
+
+                                Spacer(modifier = Modifier.padding(16.dp))
+                                HorizontalDividerMMD(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                            }
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.padding(16.dp))
+                            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                                Text(text = "Offline Maps", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                if (offlineRegions.isEmpty()) {
+                                    Text("No offline regions downloaded", fontSize = 14.sp)
+                                } else {
+                                    offlineRegions.forEach { region ->
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth()
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(region.name, fontWeight = FontWeight.SemiBold)
+                                                Text(
+                                                    if(region.status == RegionStatus.DOWNLOADING) "Downloading..." else "Available",
+                                                    fontSize = 12.sp,
+                                                    color = if(region.status == RegionStatus.DOWNLOADING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                            IconButton(onClick = {
+                                                offlineManager.deleteRegion(region.id) { success ->
+                                                    if (success) {
+                                                        refreshRegionsTrigger++
+                                                        coroutineScope.launch {
+                                                            snackbarHostState.showSnackbar("Region deleted")
+                                                        }
+                                                    }
+                                                }
+                                            }) {
+                                                Icon(Icons.Sharp.Delete, "Delete Region")
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+                                ButtonMMD(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = { navController.navigate("offline_selector") }
+                                ) {
+                                    Text("Download New Offline Map")
+                                }
                                 Spacer(modifier = Modifier.height(16.dp))
                             }
                         }
+
                         item { Spacer(modifier = Modifier.height(48.dp)) }
                     }
                 }

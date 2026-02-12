@@ -4,6 +4,7 @@ import android.content.Context
 import com.calmapps.directory.R
 import com.mapbox.common.MapboxOptions
 import com.mapbox.navigation.base.options.NavigationOptions
+import com.mapbox.navigation.base.options.RoutingTilesOptions
 import com.mapbox.navigation.core.MapboxNavigation
 import com.mapbox.navigation.core.MapboxNavigationProvider
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,8 +27,14 @@ object NavigationManager {
                 MapboxOptions.accessToken = context.getString(R.string.mapbox_access_token)
             }
 
-            val navigationOptions = NavigationOptions.Builder(context.applicationContext)
+            val routingTilesOptions = RoutingTilesOptions.Builder()
+                .tileStore(MainApplication.tileStore)
                 .build()
+
+            val navigationOptions = NavigationOptions.Builder(context.applicationContext)
+                .routingTilesOptions(routingTilesOptions)
+                .build()
+
             _mapboxNavigation = MapboxNavigationProvider.create(navigationOptions)
         }
         return _mapboxNavigation!!

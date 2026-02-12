@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
 
                     Scaffold(
                         topBar = {
-                            if (!isFullScreenMapRoute && !isPipMode) {
+                            if (!isFullScreenMapRoute && !isPipMode && currentRoute != "offline_selector") {
                                 DirectoryTopAppBar(
                                     navController = navController,
                                     navBackStackEntry = navBackStackEntry,
@@ -98,7 +98,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     ) { paddingValues ->
-                        val navModifier = if (isFullScreenMapRoute) {
+                        val navModifier = if (isFullScreenMapRoute || currentRoute == "offline_selector") {
                             Modifier
                         } else {
                             Modifier.padding(paddingValues)
@@ -119,6 +119,10 @@ class MainActivity : ComponentActivity() {
                                     navController = navController,
                                     scrollToLocationSettings = scrollToLocationSettings
                                 )
+                            }
+
+                            composable("offline_selector") {
+                                OfflineRegionSelectorScreen(navController)
                             }
 
                             composable(
