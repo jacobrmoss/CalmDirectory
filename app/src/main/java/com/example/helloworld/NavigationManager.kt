@@ -1,7 +1,7 @@
 package com.example.helloworld
 
 import android.content.Context
-import com.calmapps.directory.R
+import com.calmapps.calmmaps.R
 import com.mapbox.common.MapboxOptions
 import com.mapbox.navigation.base.options.NavigationOptions
 import com.mapbox.navigation.base.options.RoutingTilesOptions

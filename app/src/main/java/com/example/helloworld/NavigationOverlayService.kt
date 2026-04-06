@@ -8,7 +8,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import com.calmapps.directory.R
+import com.calmapps.calmmaps.R
 
 class NavigationOverlayService : Service() {
 

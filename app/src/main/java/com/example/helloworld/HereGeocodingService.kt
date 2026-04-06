@@ -1,7 +1,7 @@
 package com.example.helloworld
 
 import android.util.Log
-import com.calmapps.directory.BuildConfig
+import com.calmapps.calmmaps.BuildConfig
 import com.example.helloworld.data.UserPreferencesRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body

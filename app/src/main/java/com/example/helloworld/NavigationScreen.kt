@@ -83,7 +83,7 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavController
-import com.calmapps.directory.R
+import com.calmapps.calmmaps.R
 import com.example.helloworld.data.DistanceUnit
 import com.example.helloworld.data.UserPreferencesRepository
 import com.mapbox.api.directions.v5.DirectionsCriteria

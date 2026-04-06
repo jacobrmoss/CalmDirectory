@@ -55,7 +55,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.helloworld.ui.theme.CalmDirectoryTheme
+import com.example.helloworld.ui.theme.CalmMapsTheme
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import com.mudita.mmd.components.search_bar.SearchBarDefaultsMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
@@ -74,7 +74,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            CalmDirectoryTheme {
+            CalmMapsTheme {
                 CompositionLocalProvider(LocalPipMode provides isPipMode) {
                     val navController = rememberNavController()
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -300,7 +300,7 @@ fun DirectoryTopAppBar(
                     }
                 } else {
                     when (route) {
-                        "main" -> Text("Directory", fontWeight = FontWeight.Bold)
+                        "main" -> Text("CalmMaps", fontWeight = FontWeight.Bold)
                         "settings" -> Text("Settings", fontWeight = FontWeight.Bold)
                         else -> {
                             if (route?.startsWith("details") == true) {
@@ -383,7 +383,7 @@ fun DirectoryTopAppBar(
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
-    CalmDirectoryTheme {
+    CalmMapsTheme {
         MainScreen(rememberNavController())
     }
 }

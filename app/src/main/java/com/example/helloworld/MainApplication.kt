@@ -3,7 +3,7 @@ package com.example.helloworld
 import android.app.Application
 import com.mapbox.common.MapboxOptions
 import com.mapbox.common.TileStore
-import com.calmapps.directory.R
+import com.calmapps.calmmaps.R
 
 class MainApplication : Application() {
 

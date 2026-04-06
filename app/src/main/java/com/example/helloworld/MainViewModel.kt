@@ -2,7 +2,7 @@ package com.example.helloworld
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
-import com.calmapps.directory.BuildConfig
+import com.calmapps.calmmaps.BuildConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

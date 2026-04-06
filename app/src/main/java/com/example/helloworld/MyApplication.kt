@@ -1,7 +1,7 @@
 package com.example.helloworld
 
 import android.app.Application
-import com.calmapps.directory.R
+import com.calmapps.calmmaps.R
 import com.mapbox.navigation.base.options.NavigationOptions
 import com.mapbox.navigation.core.lifecycle.MapboxNavigationApp
 
