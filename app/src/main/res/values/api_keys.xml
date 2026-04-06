@@ -1,5 +1,0 @@
-<resources>
-    <string name="mapbox_access_token" translatable="false">pk.eyJ1IjoiZGF2aWRyYXl3aWxzb24iLCJhIjoiY21reDNoOWpqMDV1ajNrb2V6OThhYXlzdiJ9.-OQoakwutlRMF11ERneAqA</string>
-
-    <string name="mapbox_eink_style_uri" translatable="false">mapbox://styles/mapbox/light-v11</string>
-</resources>
