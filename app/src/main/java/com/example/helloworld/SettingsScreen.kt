@@ -49,7 +49,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.helloworld.data.DistanceUnit
-import com.example.helloworld.data.SearchProvider
 import com.example.helloworld.data.UserPreferencesRepository
 import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
@@ -61,8 +60,6 @@ import com.mudita.mmd.components.snackbar.SnackbarHostMMD
 import com.mudita.mmd.components.snackbar.SnackbarHostStateMMD
 import com.mudita.mmd.components.switcher.SwitchMMD
 import com.mudita.mmd.components.tabs.PrimaryTabRowMMD
-import com.mudita.mmd.components.text_field.TextFieldMMD
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -76,11 +73,6 @@ fun SettingsScreen(
     val context = LocalContext.current
     val userPreferencesRepository = remember { UserPreferencesRepository(context) }
     val offlineManager = remember { OfflineMapManager(context) }
-
-    val googleApiKey by userPreferencesRepository.googleApiKey.collectAsState(initial = "")
-    var newGoogleApiKey by remember(googleApiKey) { mutableStateOf(googleApiKey ?: "") }
-    var isEditingGoogleKey by remember(googleApiKey) { mutableStateOf(googleApiKey.isNullOrEmpty()) }
-
     val currentLocation by viewModel.currentLocation.collectAsState()
     val useDeviceLocation by viewModel.useDeviceLocation.collectAsState(initial = true)
     val defaultLocation by viewModel.defaultLocation.collectAsState(initial = "")
@@ -88,7 +80,6 @@ fun SettingsScreen(
     var isEditingLocation by remember(defaultLocation) { mutableStateOf(defaultLocation.isNullOrEmpty()) }
     val locationSuggestions by viewModel.locationSuggestions.collectAsState()
 
-    var searchProvider by remember { mutableStateOf<SearchProvider?>(null) }
     val searchRadius by userPreferencesRepository.searchRadius.collectAsState(initial = 10)
     var sliderValue by remember(searchRadius) { mutableStateOf(searchRadius.toFloat()) }
 
@@ -123,10 +114,6 @@ fun SettingsScreen(
             }
         }
 
-    LaunchedEffect(Unit) {
-        searchProvider = userPreferencesRepository.searchProvider.first()
-    }
-
     LaunchedEffect(selectedTabIndex, refreshRegionsTrigger) {
         if (selectedTabIndex == 1) {
             offlineManager.getOfflineRegions().collect { regions ->
@@ -134,7 +121,6 @@ fun SettingsScreen(
             }
         }
     }
-
     LaunchedEffect(scrollToLocationSettings) {
         if (scrollToLocationSettings) {
             selectedTabIndex = 0
@@ -147,13 +133,6 @@ fun SettingsScreen(
         if (isEditingLocation && locationSuggestions.isNotEmpty()) {
             suggestionsBringIntoViewRequester.bringIntoView()
         }
-    }
-
-    fun maskApiKey(key: String): String {
-        if (key.length <= 4) {
-            return "x".repeat(key.length)
-        }
-        return "x".repeat(key.length - 4) + key.takeLast(4)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -179,86 +158,6 @@ fun SettingsScreen(
                 0 -> {
                     LazyColumn(modifier = Modifier.fillMaxSize().weight(1f)) {
                         item { Spacer(modifier = Modifier.height(16.dp)) }
-
-                        item {
-                            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                                Text(text = "Data Provider", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                Spacer(modifier = Modifier.padding(4.dp))
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            searchProvider = SearchProvider.GOOGLE_PLACES
-                                            coroutineScope.launch {
-                                                userPreferencesRepository.saveSearchProvider(SearchProvider.GOOGLE_PLACES)
-                                                snackbarHostState.showSnackbar("Using Google Places backend")
-                                            }
-                                        }
-                                ) {
-                                    RadioButtonMMD(
-                                        selected = searchProvider == SearchProvider.GOOGLE_PLACES,
-                                        onClick = null,
-                                        modifier = Modifier.semantics { contentDescription = "Google Places" }
-                                    )
-                                    Text(text = "Google Places", modifier = Modifier.padding(start = 8.dp))
-                                }
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 8.dp)
-                                        .clickable {
-                                            searchProvider = SearchProvider.HERE
-                                            coroutineScope.launch {
-                                                userPreferencesRepository.saveSearchProvider(SearchProvider.HERE)
-                                                snackbarHostState.showSnackbar("Using HERE backend")
-                                            }
-                                        }
-                                ) {
-                                    RadioButtonMMD(
-                                        selected = searchProvider == SearchProvider.HERE,
-                                        onClick = null,
-                                        modifier = Modifier.semantics { contentDescription = "HERE Maps" }
-                                    )
-                                    Text(text = "HERE Maps", modifier = Modifier.padding(start = 8.dp))
-                                }
-
-                                if (searchProvider == SearchProvider.GOOGLE_PLACES) {
-                                    Spacer(modifier = Modifier.padding(16.dp))
-                                    Text(text = "Google Places API Key:", fontSize = 16.sp)
-                                    Spacer(modifier = Modifier.padding(4.dp))
-
-                                    if (isEditingGoogleKey) {
-                                        TextFieldMMD(
-                                            value = newGoogleApiKey,
-                                            onValueChange = { newGoogleApiKey = it },
-                                            label = { Text("Google Places API Key") }
-                                        )
-                                        Spacer(modifier = Modifier.padding(8.dp))
-                                        ButtonMMD(onClick = {
-                                            coroutineScope.launch {
-                                                userPreferencesRepository.saveGoogleApiKey(newGoogleApiKey.trim())
-                                                snackbarHostState.showSnackbar("Google Places API Key saved successfully")
-                                                isEditingGoogleKey = false
-                                            }
-                                        }) {
-                                            Text("Save")
-                                        }
-                                    } else {
-                                        Text(text = maskApiKey(googleApiKey ?: ""), fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.padding(8.dp))
-                                        ButtonMMD(onClick = { isEditingGoogleKey = true }) {
-                                            Text("Edit")
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.padding(16.dp))
-                                HorizontalDividerMMD(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                            }
-                        }
 
                         item {
                             Spacer(modifier = Modifier.padding(16.dp))

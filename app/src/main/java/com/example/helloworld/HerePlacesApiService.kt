@@ -16,6 +16,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
+interface PlacesBackend {
+    suspend fun search(query: String, lat: Double, lon: Double): List<Poi>
+    suspend fun autocomplete(query: String): List<String>
+}
+
 class HerePlacesApiService(
     private val userPreferencesRepository: UserPreferencesRepository
 ) : PlacesBackend {

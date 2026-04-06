@@ -48,6 +48,8 @@ import androidx.compose.material.icons.outlined.LocationSearching
 import androidx.compose.material.icons.outlined.Navigation
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material.icons.outlined.VolumeOff
+import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -62,6 +64,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -123,6 +126,7 @@ import com.mapbox.navigation.ui.components.maneuver.model.ManeuverPrimaryOptions
 import com.mapbox.navigation.ui.components.maneuver.model.ManeuverSecondaryOptions
 import com.mapbox.navigation.ui.components.maneuver.model.ManeuverSubOptions
 import com.mapbox.navigation.ui.components.maneuver.model.ManeuverViewOptions
+import com.mapbox.navigation.ui.components.maneuver.view.MapboxLaneGuidance
 import com.mapbox.navigation.ui.components.maneuver.view.MapboxManeuverView
 import com.mapbox.navigation.ui.maps.camera.NavigationCamera
 import com.mapbox.navigation.ui.maps.camera.data.MapboxNavigationViewportDataSource
@@ -207,6 +211,9 @@ fun NavigationScreen(
     var topBarHeight by remember { mutableStateOf(0.dp) }
     var bottomBarHeight by remember { mutableStateOf(0.dp) }
 
+    var isMuted by remember { mutableStateOf(false) }
+    val currentIsMuted by rememberUpdatedState(isMuted)
+
     fun setVolumeControl(streamType: Int) {
         context.findActivity()?.volumeControlStream = streamType
     }
@@ -233,7 +240,9 @@ fun NavigationScreen(
 
     val voiceInstructionsObserver = remember(context, speechCallback) {
         VoiceInstructionsObserver { voiceInstructions ->
-            speechApi.generate(voiceInstructions, speechCallback)
+            if (!currentIsMuted) {
+                speechApi.generate(voiceInstructions, speechCallback)
+            }
         }
     }
 
@@ -618,6 +627,7 @@ fun NavigationScreen(
                             .subManeuverBackgroundColor(blackRes)
                             .upcomingManeuverBackgroundColor(blackRes)
                             .stepDistanceTextAppearance(whiteStyle)
+                            .laneGuidanceTurnIconManeuver(R.style.LaneGuidanceTurnIconStyle)
                             .primaryManeuverOptions(ManeuverPrimaryOptions.Builder().textAppearance(whiteStyle).build())
                             .secondaryManeuverOptions(ManeuverSecondaryOptions.Builder().textAppearance(whiteStyle).build())
                             .subManeuverOptions(ManeuverSubOptions.Builder().textAppearance(whiteStyle).build())
@@ -626,6 +636,7 @@ fun NavigationScreen(
                         view.post {
                             val white = android.graphics.Color.WHITE
                             fun tintWhite(v: View) {
+                                if (v is MapboxLaneGuidance) return
                                 if (v is ImageView) v.setColorFilter(white)
                                 else if (v is TextView) v.setTextColor(white)
                                 else if (v is ViewGroup) (0 until v.childCount).forEach { tintWhite(v.getChildAt(it)) }
@@ -743,6 +754,8 @@ fun NavigationScreen(
                                             .subManeuverBackgroundColor(whiteRes)
                                             .upcomingManeuverBackgroundColor(whiteRes)
                                             .stepDistanceTextAppearance(blackStyle)
+                                            .turnIconManeuver(R.style.MapboxCustomManeuverTurnIconStyle)
+                                            .laneGuidanceTurnIconManeuver(R.style.LaneGuidanceTurnIconStyle)
                                             .primaryManeuverOptions(ManeuverPrimaryOptions.Builder().textAppearance(blackStyle).build())
                                             .secondaryManeuverOptions(ManeuverSecondaryOptions.Builder().textAppearance(blackStyle).build())
                                             .subManeuverOptions(ManeuverSubOptions.Builder().textAppearance(blackStyle).build())
@@ -752,11 +765,14 @@ fun NavigationScreen(
                                         view.post {
                                             val black = android.graphics.Color.BLACK
                                             fun tintBlack(v: View) {
+                                                if (v is MapboxLaneGuidance) return
                                                 if (v is ImageView) v.setColorFilter(black)
                                                 else if (v is TextView) v.setTextColor(black)
                                                 else if (v is ViewGroup) (0 until v.childCount).forEach { tintBlack(v.getChildAt(it)) }
                                             }
                                             tintBlack(view)
+                                            val laneId = view.resources.getIdentifier("laneGuidanceRecycler", "id", view.context.packageName)
+                                            if (laneId != 0) view.findViewById<View?>(laneId)?.setBackgroundColor(black)
                                         }
                                         view
                                     },
@@ -765,14 +781,17 @@ fun NavigationScreen(
                                             view.renderManeuvers(result)
                                             val list = result.value
                                             view.visibility = if (list != null && list.isNotEmpty()) View.VISIBLE else View.GONE
-                                            view.post {
+                                        view.post {
                                                 val black = android.graphics.Color.BLACK
                                                 fun tintBlack(v: View) {
+                                                    if (v is MapboxLaneGuidance) return
                                                     if (v is ImageView) v.setColorFilter(black)
                                                     else if (v is TextView) v.setTextColor(black)
                                                     else if (v is ViewGroup) (0 until v.childCount).forEach { tintBlack(v.getChildAt(it)) }
                                                 }
                                                 tintBlack(view)
+                                                val laneId = view.resources.getIdentifier("laneGuidanceRecycler", "id", view.context.packageName)
+                                                if (laneId != 0) view.findViewById<View?>(laneId)?.setBackgroundColor(black)
                                             }
                                         } ?: run {
                                             view.visibility = View.GONE
@@ -1097,11 +1116,31 @@ fun NavigationScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                    .padding(horizontal = 4.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column {
+                                IconButton(
+                                    modifier = Modifier.size(48.dp),
+                                    onClick = {
+                                        isMuted = !isMuted
+                                        if (isMuted) {
+                                            speechApi.cancel()
+                                            voiceInstructionsPlayer.clear()
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        if (isMuted) Icons.Outlined.VolumeOff else Icons.Outlined.VolumeUp,
+                                        contentDescription = if (isMuted) "Unmute" else "Mute",
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
+
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
                                     Text(
                                         text = routeTime,
                                         fontSize = 20.sp,

@@ -19,14 +19,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.helloworld.data.LocationRepository
-import com.example.helloworld.data.SearchProvider
 import com.example.helloworld.data.UserPreferencesRepository
 import com.mudita.mmd.components.bottom_sheet.ModalBottomSheetMMD
 import com.mudita.mmd.components.bottom_sheet.rememberModalBottomSheetMMDState
 import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
 import com.mudita.mmd.components.text_field.TextFieldMMD
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -38,16 +36,13 @@ fun MainScreen(
     searchViewModel: SearchViewModel? = null,
     mainViewModel: MainViewModel = viewModel()
 ) {
-    val apiKey by mainViewModel.apiKey.collectAsState()
     val isLoading by mainViewModel.isLoading.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     val locationRepository = remember { LocationRepository(context) }
     val userPreferencesRepository = remember { UserPreferencesRepository(context) }
-
-    val googleGeocodingService = remember { GoogleGeocodingService(userPreferencesRepository) }
-    val hereGeocodingService = remember { HereGeocodingService(userPreferencesRepository) }
+    val geocodingService = remember { HereGeocodingService(userPreferencesRepository) }
 
     val useDeviceLocation by userPreferencesRepository.useDeviceLocation.collectAsState(initial = false)
     val defaultLocation by userPreferencesRepository.defaultLocation.collectAsState(initial = null)
@@ -88,10 +83,6 @@ fun MainScreen(
         ) {
             CircularProgressIndicatorMMD()
         }
-    } else if (apiKey.isNullOrEmpty()) {
-        NoApiKeyScreen(
-            onSettingsClicked = { navController.navigate("settings") }
-        )
     } else {
         locationRepository.startLocationUpdates()
 
@@ -179,11 +170,7 @@ fun MainScreen(
                 },
                 onQuickLocationClicked = { quickLoc ->
                     scope.launch {
-                        val provider = userPreferencesRepository.searchProvider.first()
-                        val coords = when (provider) {
-                            SearchProvider.GOOGLE_PLACES -> googleGeocodingService.getCoordinates(quickLoc.address)
-                            SearchProvider.HERE -> hereGeocodingService.getCoordinates(quickLoc.address)
-                        }
+                        val coords = geocodingService.getCoordinates(quickLoc.address)
 
                         val lat = coords?.first ?: 0.0
                         val lng = coords?.second ?: 0.0

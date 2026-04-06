@@ -25,13 +25,8 @@
             android:foregroundServiceType="location" />
 
         <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="@string/places_api_key" />
-
-        <meta-data
             android:name="com.mapbox.maps.token"
             android:value="@string/mapbox_access_token" />
-
         <activity
             android:name="com.example.helloworld.MainActivity"
             android:exported="true"

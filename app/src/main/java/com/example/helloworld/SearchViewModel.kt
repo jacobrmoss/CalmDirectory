@@ -4,7 +4,6 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.helloworld.data.SearchProvider
 import com.example.helloworld.data.UserPreferencesRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
@@ -20,13 +19,9 @@ import kotlinx.coroutines.launch
 
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
     private val userPreferencesRepository = UserPreferencesRepository(application)
-    private val googleBackend: PlacesBackend = GooglePlacesApiService(application, userPreferencesRepository)
-    private val hereBackend: PlacesBackend = HerePlacesApiService(userPreferencesRepository)
-    @Volatile
-    private var currentBackend: PlacesBackend = googleBackend
+    private val backend: PlacesBackend = HerePlacesApiService(userPreferencesRepository)
     private val locationService = LocationService(application)
-    private val googleGeocodingService = GoogleGeocodingService(userPreferencesRepository)
-    private val hereGeocodingService = HereGeocodingService(userPreferencesRepository)
+    private val geocodingService = HereGeocodingService(userPreferencesRepository)
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
@@ -52,14 +47,6 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 }
         }
 
-        viewModelScope.launch {
-            userPreferencesRepository.searchProvider.collect { provider ->
-                currentBackend = when (provider) {
-                    SearchProvider.GOOGLE_PLACES -> googleBackend
-                    SearchProvider.HERE -> hereBackend
-                }
-            }
-        }
     }
 
     fun onSearchQueryChange(query: String) {
@@ -75,10 +62,9 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                     val locationDuration = System.currentTimeMillis() - locationStart
                     Log.d(
                         "SearchViewModel",
-                        "query='${query.trim()}', lat=$lat, lon=$lon, backend=${currentBackend.javaClass.simpleName}, locationTimeMs=$locationDuration"
+                        "query='${query.trim()}', lat=$lat, lon=$lon, locationTimeMs=$locationDuration"
                     )
                     val searchStart = System.currentTimeMillis()
-                    val backend = currentBackend
                     val results = backend.search(query, lat, lon)
                     val searchDuration = System.currentTimeMillis() - searchStart
                     Log.d("SearchViewModel", "Search returned ${results.size} results in ${searchDuration} ms")
@@ -127,14 +113,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 } else {
                     val defaultLocation = userPreferencesRepository.defaultLocation.first()
                     if (!defaultLocation.isNullOrBlank()) {
-                        val provider = userPreferencesRepository.searchProvider.first()
-                        val coords = when (provider) {
-                            SearchProvider.GOOGLE_PLACES ->
-                                googleGeocodingService.getCoordinates(defaultLocation)
-                            SearchProvider.HERE ->
-                                hereGeocodingService.getCoordinates(defaultLocation)
-                        }
-                        coords ?: (0.0 to 0.0)
+                        geocodingService.getCoordinates(defaultLocation) ?: (0.0 to 0.0)
                     } else {
                         0.0 to 0.0
                     }
@@ -142,14 +121,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
             } else {
                 val defaultLocation = userPreferencesRepository.defaultLocation.first()
                 if (!defaultLocation.isNullOrBlank()) {
-                    val provider = userPreferencesRepository.searchProvider.first()
-                    val coords = when (provider) {
-                        SearchProvider.GOOGLE_PLACES ->
-                            googleGeocodingService.getCoordinates(defaultLocation)
-                        SearchProvider.HERE ->
-                            hereGeocodingService.getCoordinates(defaultLocation)
-                    }
-                    coords ?: (0.0 to 0.0)
+                    geocodingService.getCoordinates(defaultLocation) ?: (0.0 to 0.0)
                 } else {
                     0.0 to 0.0
                 }

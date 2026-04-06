@@ -34,6 +34,11 @@
         <item name="maneuverTurnIconShadowColor">#00000000</item>
     </style>
 
+    <style name="LaneGuidanceTurnIconStyle" parent="MapboxStyleTurnIconManeuver">
+        <item name="maneuverTurnIconColor">#FFFFFF</item>
+        <item name="maneuverTurnIconShadowColor">#808080</item>
+    </style>
+
     <style name="MapboxCustomManeuverStyle.Overlay" parent="MapboxStyleManeuverView">
         <item name="maneuverViewBackgroundColor">@android:color/transparent</item>
         <item name="subManeuverViewBackgroundColor">@android:color/transparent</item>

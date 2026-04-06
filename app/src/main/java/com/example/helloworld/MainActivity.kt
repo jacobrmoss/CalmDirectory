@@ -79,8 +79,6 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberNavController()
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
                     val searchViewModel: SearchViewModel = viewModel()
-                    val mainViewModel: MainViewModel = viewModel()
-                    val apiKey by mainViewModel.apiKey.collectAsState()
                     val focusRequester = remember { FocusRequester() }
                     val currentRoute = navBackStackEntry?.destination?.route
                     val isFullScreenMapRoute = currentRoute?.startsWith("map?") == true
@@ -92,7 +90,6 @@ class MainActivity : ComponentActivity() {
                                     navController = navController,
                                     navBackStackEntry = navBackStackEntry,
                                     searchViewModel = searchViewModel,
-                                    apiKey = apiKey,
                                     focusRequester = focusRequester
                                 )
                             }
@@ -268,7 +265,6 @@ fun DirectoryTopAppBar(
     navController: NavHostController,
     navBackStackEntry: androidx.navigation.NavBackStackEntry?,
     searchViewModel: SearchViewModel,
-    apiKey: String?,
     focusRequester: FocusRequester
 ) {
     val context = LocalContext.current
@@ -329,7 +325,7 @@ fun DirectoryTopAppBar(
                 }
             },
             actions = {
-                if (route == "main" && !apiKey.isNullOrEmpty()) {
+                if (route == "main") {
                     IconButton(onClick = {
                         searchViewModel.resetSearch()
                         navController.navigate("search?autoFocus=true")
