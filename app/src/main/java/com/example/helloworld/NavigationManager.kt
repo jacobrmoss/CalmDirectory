@@ -2,6 +2,7 @@ package com.example.helloworld
 
 import android.content.Context
 import com.calmapps.calmmaps.R
+import com.mapbox.api.directions.v5.DirectionsCriteria
 import com.mapbox.common.MapboxOptions
 import com.mapbox.navigation.base.options.NavigationOptions
 import com.mapbox.navigation.base.options.RoutingTilesOptions
@@ -39,6 +40,8 @@ object NavigationManager {
         }
         return _mapboxNavigation!!
     }
+
+    var lastTransportMode: String = DirectionsCriteria.PROFILE_DRIVING_TRAFFIC
 
     fun setNavigationActive(active: Boolean) {
         _isNavigationActive.value = active

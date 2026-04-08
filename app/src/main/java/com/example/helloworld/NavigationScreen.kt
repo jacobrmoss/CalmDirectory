@@ -1,25 +1,19 @@
 package com.example.helloworld
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Color as AndroidColor
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
-import android.media.AudioManager
-import android.os.Build
-import android.view.ContextThemeWrapper
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.view.WindowManager
-import android.widget.ImageView
-import android.widget.TextView
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,28 +23,25 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Directions
 import androidx.compose.material.icons.outlined.DirectionsBike
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.LocationSearching
-import androidx.compose.material.icons.outlined.Navigation
+import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
-import androidx.compose.material.icons.outlined.VolumeOff
-import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,7 +56,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,28 +64,22 @@ import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.calmapps.calmmaps.R
 import com.example.helloworld.data.DistanceUnit
 import com.example.helloworld.data.UserPreferencesRepository
 import com.mapbox.api.directions.v5.DirectionsCriteria
 import com.mapbox.api.directions.v5.models.RouteOptions
-import com.mapbox.bindgen.Expected
 import com.mapbox.bindgen.Value
-import com.mapbox.common.location.Location
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.EdgeInsets
-import com.mapbox.maps.ImageHolder
 import com.mapbox.maps.MapView
 import com.mapbox.maps.MapboxExperimental
 import com.mapbox.maps.extension.compose.MapEffect
@@ -103,62 +87,27 @@ import com.mapbox.maps.extension.compose.MapboxMap
 import com.mapbox.maps.extension.compose.annotation.IconImage
 import com.mapbox.maps.extension.compose.annotation.generated.PointAnnotation
 import com.mapbox.maps.extension.style.layers.properties.generated.IconAnchor
-import com.mapbox.maps.plugin.LocationPuck2D
-import com.mapbox.maps.plugin.PuckBearing
 import com.mapbox.maps.plugin.animation.camera
-import com.mapbox.maps.plugin.locationcomponent.location
 import com.mapbox.navigation.base.extensions.applyDefaultNavigationOptions
 import com.mapbox.navigation.base.extensions.applyLanguageAndVoiceUnitOptions
-import com.mapbox.navigation.base.formatter.DistanceFormatterOptions
-import com.mapbox.navigation.base.formatter.UnitType
 import com.mapbox.navigation.base.route.NavigationRoute
 import com.mapbox.navigation.base.route.NavigationRouterCallback
 import com.mapbox.navigation.base.route.RouterFailure
 import com.mapbox.navigation.core.directions.session.RoutesObserver
-import com.mapbox.navigation.core.formatter.MapboxDistanceFormatter
-import com.mapbox.navigation.core.trip.session.LocationMatcherResult
-import com.mapbox.navigation.core.trip.session.LocationObserver
-import com.mapbox.navigation.core.trip.session.RouteProgressObserver
-import com.mapbox.navigation.core.trip.session.VoiceInstructionsObserver
-import com.mapbox.navigation.tripdata.maneuver.api.MapboxManeuverApi
-import com.mapbox.navigation.tripdata.maneuver.model.Maneuver
-import com.mapbox.navigation.tripdata.maneuver.model.ManeuverError
-import com.mapbox.navigation.ui.components.maneuver.model.ManeuverPrimaryOptions
-import com.mapbox.navigation.ui.components.maneuver.model.ManeuverSecondaryOptions
-import com.mapbox.navigation.ui.components.maneuver.model.ManeuverSubOptions
-import com.mapbox.navigation.ui.components.maneuver.model.ManeuverViewOptions
-import com.mapbox.navigation.ui.components.maneuver.view.MapboxLaneGuidance
-import com.mapbox.navigation.ui.components.maneuver.view.MapboxManeuverView
 import com.mapbox.navigation.ui.maps.camera.NavigationCamera
 import com.mapbox.navigation.ui.maps.camera.data.MapboxNavigationViewportDataSource
-import com.mapbox.navigation.ui.maps.camera.transition.NavigationCameraTransitionOptions
-import com.mapbox.navigation.ui.maps.location.NavigationLocationProvider
-import com.mapbox.navigation.ui.maps.route.arrow.api.MapboxRouteArrowApi
-import com.mapbox.navigation.ui.maps.route.arrow.api.MapboxRouteArrowView
-import com.mapbox.navigation.ui.maps.route.arrow.model.RouteArrowOptions
 import com.mapbox.navigation.ui.maps.route.line.api.MapboxRouteLineApi
 import com.mapbox.navigation.ui.maps.route.line.api.MapboxRouteLineView
 import com.mapbox.navigation.ui.maps.route.line.model.MapboxRouteLineApiOptions
 import com.mapbox.navigation.ui.maps.route.line.model.MapboxRouteLineViewOptions
 import com.mapbox.navigation.ui.maps.route.line.model.RouteLineColorResources
-import com.mapbox.navigation.voice.api.MapboxSpeechApi
-import com.mapbox.navigation.voice.api.MapboxVoiceInstructionsPlayer
-import com.mapbox.navigation.voice.model.SpeechAnnouncement
-import com.mapbox.navigation.voice.model.SpeechError
-import com.mapbox.navigation.voice.model.SpeechValue
-import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.buttons.OutlinedButtonMMD
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 private enum class ScreenState {
     POI_OVERVIEW,
-    ROUTE_PREVIEW,
-    NAVIGATING
+    ROUTE_PREVIEW
 }
 
 fun Context.findActivity(): Activity? {
@@ -181,8 +130,6 @@ fun NavigationScreen(
     poiLng: Double
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val isPipMode = LocalPipMode.current
     val scope = rememberCoroutineScope()
     val locationService = remember { LocationService(context) }
     val userPreferencesRepository = remember { UserPreferencesRepository(context) }
@@ -209,112 +156,21 @@ fun NavigationScreen(
         }
     }
 
-    val mapboxNavigation = remember(context) {
-        NavigationManager.getInstance(context)
-    }
+    val mapboxNavigation = remember(context) { NavigationManager.getInstance(context) }
 
     var screenState by remember { mutableStateOf(ScreenState.POI_OVERVIEW) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var originLabel by remember { mutableStateOf("Locating...") }
     var transportMode by remember { mutableStateOf(DirectionsCriteria.PROFILE_DRIVING_TRAFFIC) }
+    // Session-only GPS override: true when the user taps "Use current location"
+    // in the route preview. Does not change the global preference.
+    var useActualLocationForSession by remember { mutableStateOf(false) }
 
     val markerBitmap = rememberMarkerBitmap()
-    val puckBitmap = rememberLocationPuckBitmap()
-
-    var maneuversResult by remember { mutableStateOf<Expected<ManeuverError, List<Maneuver>>?>(null) }
-
     val density = LocalDensity.current
     var topBarHeight by remember { mutableStateOf(0.dp) }
     var bottomBarHeight by remember { mutableStateOf(0.dp) }
-
-    var isMuted by remember { mutableStateOf(false) }
-    val currentIsMuted by rememberUpdatedState(isMuted)
-
-    fun setVolumeControl(streamType: Int) {
-        context.findActivity()?.volumeControlStream = streamType
-    }
-
-    val speechApi = remember { MapboxSpeechApi(context, Locale.getDefault().toLanguageTag()) }
-    val voiceInstructionsPlayer = remember { MapboxVoiceInstructionsPlayer(context, Locale.getDefault().toLanguageTag()) }
-
-    val voiceInstructionsPlayerCallback = remember(context) {
-        { announcement: SpeechAnnouncement ->
-            speechApi.clean(announcement)
-            setVolumeControl(AudioManager.USE_DEFAULT_STREAM_TYPE)
-        }
-    }
-
-    val speechCallback = remember(context, voiceInstructionsPlayerCallback) {
-        { expected: Expected<SpeechError, SpeechValue> ->
-            setVolumeControl(AudioManager.STREAM_MUSIC)
-            expected.fold(
-                { error -> voiceInstructionsPlayer.play(error.fallback, voiceInstructionsPlayerCallback) },
-                { value -> voiceInstructionsPlayer.play(value.announcement, voiceInstructionsPlayerCallback) }
-            )
-        }
-    }
-
-    val voiceInstructionsObserver = remember(context, speechCallback) {
-        VoiceInstructionsObserver { voiceInstructions ->
-            if (!currentIsMuted) {
-                speechApi.generate(voiceInstructions, speechCallback)
-            }
-        }
-    }
-
-    DisposableEffect(screenState) {
-        val window = context.findActivity()?.window
-        if (screenState == ScreenState.NAVIGATING) {
-            window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
-        onDispose {
-            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
-    }
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                mapboxNavigation.registerVoiceInstructionsObserver(voiceInstructionsObserver)
-            } else if (event == Lifecycle.Event.ON_PAUSE) {
-                val activity = context.findActivity()
-                val isInPip = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    activity?.isInPictureInPictureMode == true
-                } else {
-                    false
-                }
-
-                if (!isInPip) {
-                    mapboxNavigation.unregisterVoiceInstructionsObserver(voiceInstructionsObserver)
-                }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-
-        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-            mapboxNavigation.registerVoiceInstructionsObserver(voiceInstructionsObserver)
-        }
-
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            mapboxNavigation.unregisterVoiceInstructionsObserver(voiceInstructionsObserver)
-        }
-    }
-
-    val distanceFormatterOptions = remember(distanceUnit) {
-        DistanceFormatterOptions.Builder(context)
-            .unitType(
-                if (distanceUnit == DistanceUnit.IMPERIAL) UnitType.IMPERIAL else UnitType.METRIC
-            )
-            .build()
-    }
-    val distanceFormatter = remember(distanceFormatterOptions) { MapboxDistanceFormatter(distanceFormatterOptions) }
-    val maneuverApi = remember(distanceFormatter) { MapboxManeuverApi(distanceFormatter) }
-
-    var routeTime by remember { mutableStateOf("") }
-    var routeDistance by remember { mutableStateOf("") }
-    var routeEta by remember { mutableStateOf("") }
 
     val routeLineColorResources = remember {
         RouteLineColorResources.Builder()
@@ -337,7 +193,6 @@ fun NavigationScreen(
             .build()
     }
     val routeLineApi = remember { MapboxRouteLineApi(MapboxRouteLineApiOptions.Builder().build()) }
-
     val routeLineView = remember {
         MapboxRouteLineView(
             MapboxRouteLineViewOptions.Builder(context)
@@ -346,34 +201,19 @@ fun NavigationScreen(
                 .build()
         )
     }
-    val routeArrowApi = remember { MapboxRouteArrowApi() }
-    val routeArrowView = remember { MapboxRouteArrowView(RouteArrowOptions.Builder(context).build()) }
 
-    val navigationLocationProvider = remember { NavigationLocationProvider() }
     var mapView by remember { mutableStateOf<MapView?>(null) }
     var navigationCamera by remember { mutableStateOf<NavigationCamera?>(null) }
-
-    LaunchedEffect(isPipMode) {
-        if (isPipMode) {
-            navigationCamera?.requestNavigationCameraToFollowing(
-                stateTransitionOptions = NavigationCameraTransitionOptions.Builder()
-                    .maxDuration(0)
-                    .build()
-            )
-        }
-    }
-
     var viewportDataSource by remember { mutableStateOf<MapboxNavigationViewportDataSource?>(null) }
-
     var isStyleLoaded by remember { mutableStateOf(false) }
 
     fun fetchRoute() {
         scope.launch {
             isLoading = true
             errorMessage = null
-
             try {
-                val originPoint: Point? = if (useDeviceLocation) {
+                val effectiveUseDevice = useDeviceLocation || useActualLocationForSession
+                val originPoint: Point? = if (effectiveUseDevice) {
                     val bestLocation = locationService.getCurrentLocation()
                     if (bestLocation != null) {
                         originLabel = "Current location"
@@ -406,24 +246,17 @@ fun NavigationScreen(
                     return@launch
                 }
 
-                val destinationPoint = Point.fromLngLat(poiLng, poiLat)
-
-                val routeOptions = RouteOptions.builder()
-                    .applyDefaultNavigationOptions()
-                    .applyLanguageAndVoiceUnitOptions(context)
-                    .profile(transportMode)
-                    .coordinatesList(listOf(originPoint, destinationPoint))
-                    .build()
-
                 mapboxNavigation.requestRoutes(
-                    routeOptions,
+                    RouteOptions.builder()
+                        .applyDefaultNavigationOptions()
+                        .applyLanguageAndVoiceUnitOptions(context)
+                        .profile(transportMode)
+                        .coordinatesList(listOf(originPoint, Point.fromLngLat(poiLng, poiLat)))
+                        .build(),
                     object : NavigationRouterCallback {
                         override fun onRoutesReady(routes: List<NavigationRoute>, routerOrigin: String) {
-                            if (routes.isNotEmpty()) {
-                                mapboxNavigation.setNavigationRoutes(routes)
-                            } else {
-                                errorMessage = "No route found."
-                            }
+                            if (routes.isNotEmpty()) mapboxNavigation.setNavigationRoutes(routes)
+                            else errorMessage = "No route found."
                             isLoading = false
                         }
                         override fun onFailure(reasons: List<RouterFailure>, routeOptions: RouteOptions) {
@@ -442,32 +275,19 @@ fun NavigationScreen(
         }
     }
 
-    fun resetCameraToPoi() {
-        mapView?.let { view ->
-            view.getMapboxMap().setCamera(
-                CameraOptions.Builder()
-                    .center(Point.fromLngLat(poiLng, poiLat))
-                    .zoom(15.0)
-                    .padding(EdgeInsets(0.0, 0.0, 0.0, 0.0))
-                    .build()
-            )
-        }
+    // Re-fetch when location preference changes while a route is already previewed
+    LaunchedEffect(useDeviceLocation, defaultLocation) {
+        if (screenState == ScreenState.ROUTE_PREVIEW) fetchRoute()
     }
 
-    fun stopNavigationSession() {
-        mapboxNavigation.stopTripSession()
-        NavigationManager.setNavigationActive(false)
-        context.stopService(Intent(context, NavigationOverlayService::class.java))
-
-        speechApi.cancel()
-        voiceInstructionsPlayer.clear()
-        setVolumeControl(AudioManager.USE_DEFAULT_STREAM_TYPE)
-        mapView?.getMapboxMap()?.getStyle()?.let { style ->
-            routeArrowView.render(style, routeArrowApi.clearArrows())
-        }
-
-        screenState = ScreenState.ROUTE_PREVIEW
-        navigationCamera?.requestNavigationCameraToOverview()
+    fun resetCameraToPoi() {
+        mapView?.getMapboxMap()?.setCamera(
+            CameraOptions.Builder()
+                .center(Point.fromLngLat(poiLng, poiLat))
+                .zoom(15.0)
+                .padding(EdgeInsets(0.0, 0.0, 0.0, 0.0))
+                .build()
+        )
     }
 
     fun clearRouteAndReturnToOverview() {
@@ -477,33 +297,43 @@ fun NavigationScreen(
                 routeLineView.renderClearRouteLineValue(style, value)
             }
         }
+        useActualLocationForSession = false
         screenState = ScreenState.POI_OVERVIEW
         resetCameraToPoi()
     }
 
-    fun startNavigation() {
-        mapboxNavigation.startTripSession()
-        screenState = ScreenState.NAVIGATING
+    fun launchNavigation() {
+        NavigationManager.lastTransportMode = transportMode
         NavigationManager.setNavigationActive(true)
-        context.startService(Intent(context, NavigationOverlayService::class.java))
-        navigationCamera?.requestNavigationCameraToFollowing(
-            stateTransitionOptions = NavigationCameraTransitionOptions.Builder()
-                .maxDuration(0)
-                .build()
+        navController.navigate("navigation_active?lat=${poiLat.toFloat()}&lng=${poiLng.toFloat()}")
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                      permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (granted) launchNavigation()
+        else errorMessage = "Location permission is required for turn-by-turn navigation."
+    }
+
+    fun requestNavigationStart() {
+        val hasFine = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasFine || hasCoarse) launchNavigation()
+        else locationPermissionLauncher.launch(
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
         )
     }
 
     BackHandler(enabled = true) {
         when (screenState) {
-            ScreenState.NAVIGATING -> {
-                stopNavigationSession()
-            }
-            ScreenState.ROUTE_PREVIEW -> {
-                clearRouteAndReturnToOverview()
-            }
-            ScreenState.POI_OVERVIEW -> {
-                navController.popBackStack()
-            }
+            ScreenState.ROUTE_PREVIEW -> clearRouteAndReturnToOverview()
+            ScreenState.POI_OVERVIEW -> navController.popBackStack()
         }
     }
 
@@ -513,231 +343,65 @@ fun NavigationScreen(
 
             if (viewportDataSource == null || navigationCamera == null) {
                 viewportDataSource = MapboxNavigationViewportDataSource(mapboxMap).apply {
-                    val density = context.resources.displayMetrics.density.toDouble()
-                    followingPadding = EdgeInsets(120.0 * density, 40.0 * density, 120.0 * density, 40.0 * density)
-                    overviewPadding = EdgeInsets(100.0 * density, 100.0 * density, 100.0 * density, 100.0 * density)
+                    val d = context.resources.displayMetrics.density.toDouble()
+                    followingPadding = EdgeInsets(120.0 * d, 40.0 * d, 120.0 * d, 40.0 * d)
+                    overviewPadding = EdgeInsets(100.0 * d, 100.0 * d, 100.0 * d, 100.0 * d)
                 }
-                mapView?.let { view ->
-                    navigationCamera = NavigationCamera(mapboxMap, view.camera, viewportDataSource!!)
-                }
-
-                mapView!!.location.apply {
-                    enabled = true
-                    puckBearingEnabled = true
-                    puckBearing = PuckBearing.COURSE
-                    locationPuck = LocationPuck2D(
-                        bearingImage = ImageHolder.from(puckBitmap),
-                        shadowImage = null,
-                        scaleExpression = null
-                    )
-                    setLocationProvider(navigationLocationProvider)
-                }
-                if (screenState == ScreenState.NAVIGATING) {
-                    navigationCamera?.requestNavigationCameraToFollowing(
-                        stateTransitionOptions = NavigationCameraTransitionOptions.Builder()
-                            .maxDuration(0)
-                            .build()
-                    )
-                } else if (screenState == ScreenState.POI_OVERVIEW) {
-                    mapboxMap.setCamera(
-                        CameraOptions.Builder().center(Point.fromLngLat(poiLng, poiLat)).zoom(15.0).build()
-                    )
-                }
+                navigationCamera = NavigationCamera(mapboxMap, mapView!!.camera, viewportDataSource!!)
+                mapboxMap.setCamera(
+                    CameraOptions.Builder().center(Point.fromLngLat(poiLng, poiLat)).zoom(15.0).build()
+                )
             }
 
             val routesObserver = RoutesObserver { result ->
-                speechApi.cancel()
-                voiceInstructionsPlayer.clear()
-                setVolumeControl(AudioManager.USE_DEFAULT_STREAM_TYPE)
-
                 routeLineApi.setNavigationRoutes(result.navigationRoutes) { drawData ->
-                    mapView?.getMapboxMap()?.let { map ->
-                        map.getStyle()?.let { style ->
-                            routeLineView.renderRouteDrawData(style, drawData)
-                        }
-                    }
-                }
-
-                if (result.navigationRoutes.isNotEmpty()) {
-                    val primaryRoute = result.navigationRoutes[0]
-                    viewportDataSource?.onRouteChanged(primaryRoute)
-                    viewportDataSource?.evaluate()
-
-                    if (screenState == ScreenState.POI_OVERVIEW) {
-                        screenState = ScreenState.ROUTE_PREVIEW
-                        navigationCamera?.requestNavigationCameraToOverview()
-                    } else if (screenState == ScreenState.ROUTE_PREVIEW) {
-                        navigationCamera?.requestNavigationCameraToOverview()
-                    }
-                }
-            }
-
-            val locationObserver = object : LocationObserver {
-                override fun onNewLocationMatcherResult(result: LocationMatcherResult) {
-                    val enhanced = result.enhancedLocation
-                    navigationLocationProvider.changePosition(enhanced, result.keyPoints)
-                    viewportDataSource?.onLocationChanged(enhanced)
-                    viewportDataSource?.evaluate()
-                }
-                override fun onNewRawLocation(rawLocation: Location) {}
-            }
-
-            val routeProgressObserver = RouteProgressObserver { routeProgress ->
-                viewportDataSource?.onRouteProgressChanged(routeProgress)
-                viewportDataSource?.evaluate()
-
-                mapView?.getMapboxMap()?.getStyle()?.let { style ->
-                    val arrowUpdate = routeArrowApi.addUpcomingManeuverArrow(routeProgress)
-                    routeArrowView.renderManeuverUpdate(style, arrowUpdate)
-                }
-
-                maneuversResult = maneuverApi.getManeuvers(routeProgress)
-
-                val duration = routeProgress.durationRemaining
-                val distance = routeProgress.distanceRemaining
-
-                val hours = TimeUnit.SECONDS.toHours(duration.toLong())
-                val minutes = TimeUnit.SECONDS.toMinutes(duration.toLong()) % 60
-                val sb = StringBuilder()
-                if (hours > 0) {
-                    sb.append("$hours hr ")
-                }
-                sb.append("$minutes min")
-                routeTime = sb.toString()
-
-                routeDistance = distanceFormatter.formatDistance(distance.toDouble()).toString()
-
-                val calendar = Calendar.getInstance()
-                calendar.add(Calendar.SECOND, duration.toInt())
-                val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
-                routeEta = sdf.format(calendar.time)
-            }
-
-            mapboxNavigation.registerRoutesObserver(routesObserver)
-            mapboxNavigation.registerLocationObserver(locationObserver)
-            mapboxNavigation.registerRouteProgressObserver(routeProgressObserver)
-
-            val currentRoutes = mapboxNavigation.getNavigationRoutes()
-            if (currentRoutes.isNotEmpty()) {
-                routeLineApi.setNavigationRoutes(currentRoutes) { drawData ->
                     mapView?.getMapboxMap()?.getStyle()?.let { style ->
                         routeLineView.renderRouteDrawData(style, drawData)
                     }
                 }
+                if (result.navigationRoutes.isNotEmpty()) {
+                    viewportDataSource?.onRouteChanged(result.navigationRoutes[0])
+                    viewportDataSource?.evaluate()
+                    if (screenState == ScreenState.POI_OVERVIEW) {
+                        screenState = ScreenState.ROUTE_PREVIEW
+                    }
+                    navigationCamera?.requestNavigationCameraToOverview()
+                }
             }
+
+            mapboxNavigation.registerRoutesObserver(routesObserver)
 
             onDispose {
                 mapboxNavigation.unregisterRoutesObserver(routesObserver)
-                mapboxNavigation.unregisterLocationObserver(locationObserver)
-                mapboxNavigation.unregisterRouteProgressObserver(routeProgressObserver)
-
                 if (!NavigationManager.isNavigationActive.value) {
                     mapboxNavigation.setNavigationRoutes(emptyList())
                 }
-
                 routeLineApi.clearRouteLine { }
-
-                speechApi.cancel()
-                voiceInstructionsPlayer.shutdown()
-                setVolumeControl(AudioManager.USE_DEFAULT_STREAM_TYPE)
-
                 routeLineApi.cancel()
                 routeLineView.cancel()
-                maneuverApi.cancel()
-                maneuversResult = null
             }
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-
-        if (isPipMode) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(ComposeColor.Black),
-                contentAlignment = Alignment.Center
-            ) {
-                AndroidView(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight(),
-                    factory = { ctx ->
-                        val wrappedContext = ContextThemeWrapper(ctx, R.style.Theme_HelloWorld)
-                        val view = LayoutInflater.from(wrappedContext).inflate(R.layout.view_maneuver, null, false) as MapboxManeuverView
-                        val blackRes = android.R.color.black
-                        val whiteStyle = R.style.ManeuverTextAppearance_Overlay
-                        val options = ManeuverViewOptions.Builder()
-                            .maneuverBackgroundColor(blackRes)
-                            .subManeuverBackgroundColor(blackRes)
-                            .upcomingManeuverBackgroundColor(blackRes)
-                            .stepDistanceTextAppearance(whiteStyle)
-                            .laneGuidanceTurnIconManeuver(R.style.LaneGuidanceTurnIconStyle)
-                            .primaryManeuverOptions(ManeuverPrimaryOptions.Builder().textAppearance(whiteStyle).build())
-                            .secondaryManeuverOptions(ManeuverSecondaryOptions.Builder().textAppearance(whiteStyle).build())
-                            .subManeuverOptions(ManeuverSubOptions.Builder().textAppearance(whiteStyle).build())
-                            .build()
-                        view.updateManeuverViewOptions(options)
-                        view.post {
-                            val white = android.graphics.Color.WHITE
-                            fun tintWhite(v: View) {
-                                if (v is MapboxLaneGuidance) return
-                                if (v is ImageView) v.setColorFilter(white)
-                                else if (v is TextView) v.setTextColor(white)
-                                else if (v is ViewGroup) (0 until v.childCount).forEach { tintWhite(v.getChildAt(it)) }
-                            }
-                            tintWhite(view)
-                        }
-                        view
-                    },
-                    update = { view ->
-                        maneuversResult?.let { result ->
-                            view.renderManeuvers(result)
-                            val list = result.value
-                            view.visibility = if (list != null && list.isNotEmpty()) View.VISIBLE else View.GONE
-                        } ?: run { view.visibility = View.GONE }
-                    }
-                )
-            }
-        }
-
-        val mapModifier = if (isPipMode) {
-            Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight()
-                .fillMaxWidth(0f)
-                .zIndex(1f)
-        } else {
-            Modifier
+        Box(
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(top = topBarHeight, bottom = bottomBarHeight)
                 .zIndex(0f)
-        }
-
-        Box(modifier = mapModifier) {
+        ) {
             MapboxMap(
                 modifier = Modifier.fillMaxSize(),
                 compass = { },
                 scaleBar = { },
-                logo = {
-                    if (!isPipMode) {
-                        Logo(modifier = Modifier.align(Alignment.BottomStart))
-                    }
-                },
-                attribution = {
-                    if (!isPipMode) {
-                        Attribution(modifier = Modifier.align(Alignment.BottomEnd))
-                    }
-                }
+                logo = { Logo(modifier = Modifier.align(Alignment.BottomStart)) },
+                attribution = { Attribution(modifier = Modifier.align(Alignment.BottomEnd)) }
             ) {
                 MapEffect(Unit) { mapViewInstance ->
                     mapView = mapViewInstance
-                    val styleUri = mapViewInstance.context.getString(R.string.mapbox_eink_style_uri)
                     mapViewInstance.getMapboxMap().apply {
-                        if (screenState == ScreenState.POI_OVERVIEW) {
-                            setCamera(CameraOptions.Builder().center(Point.fromLngLat(poiLng, poiLat)).zoom(15.0).build())
-                        }
-                        loadStyleUri(styleUri) { style ->
+                        setCamera(CameraOptions.Builder().center(Point.fromLngLat(poiLng, poiLat)).zoom(15.0).build())
+                        loadStyleUri(mapViewInstance.context.getString(R.string.mapbox_eink_style_uri)) { style ->
                             isStyleLoaded = true
                             style.styleLayers.forEach { layer ->
                                 when (layer.type) {
@@ -752,11 +416,8 @@ fun NavigationScreen(
                         }
                     }
                 }
-
                 if (markerBitmap != null) {
-                    PointAnnotation(
-                        point = Point.fromLngLat(poiLng, poiLat)
-                    ) {
+                    PointAnnotation(point = Point.fromLngLat(poiLng, poiLat)) {
                         iconImage = IconImage(markerBitmap)
                         iconAnchor = IconAnchor.BOTTOM
                         iconSize = 1.0
@@ -765,469 +426,222 @@ fun NavigationScreen(
             }
         }
 
-        if (!isPipMode) {
-            Column(
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(2f)
+        ) {
+            // Top bar
+            Surface(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(2f)
+                    .fillMaxWidth()
+                    .onGloballyPositioned { topBarHeight = with(density) { it.size.height.toDp() } },
+                color = MaterialTheme.colorScheme.surface
             ) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onGloballyPositioned { coordinates ->
-                            topBarHeight = with(density) { coordinates.size.height.toDp() }
-                        },
-                    color = MaterialTheme.colorScheme.surface
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = if (screenState == ScreenState.NAVIGATING) 0.dp else 16.dp)
-                        ) {
-                            if (screenState == ScreenState.NAVIGATING) {
-                                AndroidView(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    factory = { ctx ->
-                                        val wrappedContext = ContextThemeWrapper(ctx, R.style.Theme_HelloWorld)
-                                        val view = LayoutInflater.from(wrappedContext).inflate(R.layout.view_maneuver, null, false) as MapboxManeuverView
-                                        val whiteRes = android.R.color.white
-                                        val blackStyle = R.style.ManeuverTextAppearance
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp)
+                    ) {
+                        IconButton(onClick = {
+                            when (screenState) {
+                                ScreenState.POI_OVERVIEW -> navController.popBackStack()
+                                ScreenState.ROUTE_PREVIEW -> clearRouteAndReturnToOverview()
+                            }
+                        }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        }
 
-                                        val options = ManeuverViewOptions.Builder()
-                                            .maneuverBackgroundColor(whiteRes)
-                                            .subManeuverBackgroundColor(whiteRes)
-                                            .upcomingManeuverBackgroundColor(whiteRes)
-                                            .stepDistanceTextAppearance(blackStyle)
-                                            .turnIconManeuver(R.style.MapboxCustomManeuverTurnIconStyle)
-                                            .laneGuidanceTurnIconManeuver(R.style.LaneGuidanceTurnIconStyle)
-                                            .primaryManeuverOptions(ManeuverPrimaryOptions.Builder().textAppearance(blackStyle).build())
-                                            .secondaryManeuverOptions(ManeuverSecondaryOptions.Builder().textAppearance(blackStyle).build())
-                                            .subManeuverOptions(ManeuverSubOptions.Builder().textAppearance(blackStyle).build())
-                                            .build()
+                        Spacer(modifier = Modifier.width(8.dp))
 
-                                        view.updateManeuverViewOptions(options)
-                                        view.post {
-                                            val black = android.graphics.Color.BLACK
-                                            fun tintBlack(v: View) {
-                                                if (v is MapboxLaneGuidance) return
-                                                if (v is ImageView) v.setColorFilter(black)
-                                                else if (v is TextView) v.setTextColor(black)
-                                                else if (v is ViewGroup) (0 until v.childCount).forEach { tintBlack(v.getChildAt(it)) }
-                                            }
-                                            tintBlack(view)
-                                            val laneId = view.resources.getIdentifier("laneGuidanceRecycler", "id", view.context.packageName)
-                                            if (laneId != 0) view.findViewById<View?>(laneId)?.setBackgroundColor(black)
-                                        }
-                                        view
-                                    },
-                                    update = { view ->
-                                        maneuversResult?.let { result ->
-                                            view.renderManeuvers(result)
-                                            val list = result.value
-                                            view.visibility = if (list != null && list.isNotEmpty()) View.VISIBLE else View.GONE
-                                        view.post {
-                                                val black = android.graphics.Color.BLACK
-                                                fun tintBlack(v: View) {
-                                                    if (v is MapboxLaneGuidance) return
-                                                    if (v is ImageView) v.setColorFilter(black)
-                                                    else if (v is TextView) v.setTextColor(black)
-                                                    else if (v is ViewGroup) (0 until v.childCount).forEach { tintBlack(v.getChildAt(it)) }
-                                                }
-                                                tintBlack(view)
-                                                val laneId = view.resources.getIdentifier("laneGuidanceRecycler", "id", view.context.packageName)
-                                                if (laneId != 0) view.findViewById<View?>(laneId)?.setBackgroundColor(black)
-                                            }
-                                        } ?: run {
-                                            view.visibility = View.GONE
-                                        }
-                                    }
-                                )
-                            } else if (screenState == ScreenState.ROUTE_PREVIEW || isLoading || screenState == ScreenState.POI_OVERVIEW) {
-                                IconButton(onClick = {
-                                    when(screenState) {
-                                        ScreenState.POI_OVERVIEW -> navController.popBackStack()
-                                        ScreenState.ROUTE_PREVIEW -> {
-                                            clearRouteAndReturnToOverview()
-                                        }
-                                        else -> {null}
-                                    }
-                                }) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        if (screenState == ScreenState.ROUTE_PREVIEW || isLoading) {
+                            Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                ) {
+                                    Icon(Icons.Outlined.RadioButtonUnchecked, "Origin", tint = MaterialTheme.colorScheme.onSurface)
+                                    VerticalDottedLine(modifier = Modifier.width(2.dp).height(32.dp))
+                                    Icon(Icons.Outlined.Place, "Destination", tint = MaterialTheme.colorScheme.onSurface)
                                 }
-
-                                Spacer(modifier = Modifier.width(8.dp))
-
-                                if (screenState == ScreenState.ROUTE_PREVIEW || isLoading) {
-                                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 4.dp)) {
-                                            Icon(Icons.Outlined.RadioButtonUnchecked, "Origin", tint = MaterialTheme.colorScheme.onSurface)
-                                            VerticalDottedLine(modifier = Modifier.width(2.dp).height(32.dp))
-                                            Icon(Icons.Outlined.Place, "Destination", tint = MaterialTheme.colorScheme.onSurface)
-                                        }
-
-                                        Spacer(modifier = Modifier.width(12.dp))
-
-                                        Column(
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                                    Text(originLabel, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                    if (!useDeviceLocation && !useActualLocationForSession) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Row(
                                             modifier = Modifier
-                                                .weight(1f)
-                                                .padding(end = 16.dp)
+                                                .clickable {
+                                                    useActualLocationForSession = true
+                                                    fetchRoute()
+                                                }
+                                                .border(
+                                                    width = 1.dp,
+                                                    color = MaterialTheme.colorScheme.outline,
+                                                    shape = RoundedCornerShape(6.dp)
+                                                )
+                                                .padding(horizontal = 8.dp, vertical = 5.dp),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(originLabel, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                                            HorizontalDividerMMD(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 16.dp))
-                                            Text(poiName, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                            Icon(
+                                                Icons.Outlined.MyLocation,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(5.dp))
+                                            Text(
+                                                text = "Use current location",
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
                                         }
+                                    }
+                                    HorizontalDividerMMD(
+                                        thickness = 1.dp,
+                                        color = MaterialTheme.colorScheme.outlineVariant,
+                                        modifier = Modifier.padding(vertical = 16.dp)
+                                    )
+                                    Text(poiName, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                }
+                            }
+                        } else {
+                            Column(
+                                modifier = Modifier.weight(1f).padding(end = 16.dp),
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                if (isPlace) {
+                                    Text(poiName, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(poiAddress, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    currentUserLocation?.let { loc ->
+                                        val results = FloatArray(1)
+                                        android.location.Location.distanceBetween(loc.latitude, loc.longitude, poiLat, poiLng, results)
+                                        val d = results[0]
+                                        val label = if (distanceUnit == DistanceUnit.IMPERIAL) {
+                                            val mi = d * 0.000621371
+                                            if (mi >= 0.1) "%.1f mi".format(mi) else "%.0f ft".format(d * 3.28084)
+                                        } else {
+                                            if (d >= 1000) "%.1f km".format(d / 1000) else "%.0f m".format(d)
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(label, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                                     }
                                 } else {
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .padding(end = 16.dp),
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        if (isPlace) {
-                                            Text(
-                                                text = poiName,
-                                                fontSize = 20.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-
-                                            Spacer(modifier = Modifier.height(8.dp))
-
-                                            Text(
-                                                text = poiAddress,
-                                                fontSize = 16.sp,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-
-                                            currentUserLocation?.let { loc ->
-                                                val results = FloatArray(1)
-                                                android.location.Location.distanceBetween(
-                                                    loc.latitude,
-                                                    loc.longitude,
-                                                    poiLat,
-                                                    poiLng,
-                                                    results
-                                                )
-                                                val distanceInMeters = results[0]
-
-                                                val distanceString = if (distanceUnit == DistanceUnit.IMPERIAL) {
-                                                    val miles = distanceInMeters * 0.000621371
-                                                    if (miles >= 0.1) {
-                                                        "%.1f mi".format(miles)
-                                                    } else {
-                                                        "%.0f ft".format(distanceInMeters * 3.28084)
-                                                    }
-                                                } else {
-                                                    if (distanceInMeters >= 1000) {
-                                                        "%.1f km".format(distanceInMeters / 1000)
-                                                    } else {
-                                                        "%.0f m".format(distanceInMeters)
-                                                    }
-                                                }
-
-                                                Spacer(modifier = Modifier.height(8.dp))
-
-                                                Text(
-                                                    text = distanceString,
-                                                    fontSize = 16.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = MaterialTheme.colorScheme.onSurface
-                                                )
-                                            }
-
+                                    Text(poiName, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    currentUserLocation?.let { loc ->
+                                        val results = FloatArray(1)
+                                        android.location.Location.distanceBetween(loc.latitude, loc.longitude, poiLat, poiLng, results)
+                                        val d = results[0]
+                                        val label = if (distanceUnit == DistanceUnit.IMPERIAL) {
+                                            val mi = d * 0.000621371
+                                            if (mi >= 0.1) "%.1f mi".format(mi) else "%.0f ft".format(d * 3.28084)
                                         } else {
-                                            Text(
-                                                text = poiName,
-                                                fontSize = 24.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-
-                                            currentUserLocation?.let { loc ->
-                                                val results = FloatArray(1)
-                                                android.location.Location.distanceBetween(
-                                                    loc.latitude,
-                                                    loc.longitude,
-                                                    poiLat,
-                                                    poiLng,
-                                                    results
-                                                )
-                                                val distanceInMeters = results[0]
-
-                                                val distanceString = if (distanceUnit == DistanceUnit.IMPERIAL) {
-                                                    val miles = distanceInMeters * 0.000621371
-                                                    if (miles >= 0.1) {
-                                                        "%.1f mi".format(miles)
-                                                    } else {
-                                                        "%.0f ft".format(distanceInMeters * 3.28084)
-                                                    }
-                                                } else {
-                                                    if (distanceInMeters >= 1000) {
-                                                        "%.1f km".format(distanceInMeters / 1000)
-                                                    } else {
-                                                        "%.0f m".format(distanceInMeters)
-                                                    }
-                                                }
-
-                                                Spacer(modifier = Modifier.height(8.dp))
-
-                                                Text(
-                                                    text = distanceString,
-                                                    fontSize = 14.sp,
-                                                    color = MaterialTheme.colorScheme.onSurface
-                                                )
-                                            }
+                                            if (d >= 1000) "%.1f km".format(d / 1000) else "%.0f m".format(d)
                                         }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(label, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
                                     }
                                 }
                             }
                         }
-
-                        HorizontalDividerMMD(
-                            thickness = 3.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant,
-                            modifier = Modifier
-                                .padding(top = if (screenState == ScreenState.NAVIGATING) 0.dp else 16.dp)
-                        )
                     }
+                    HorizontalDividerMMD(
+                        thickness = 3.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
                 }
+            }
 
-                Spacer(modifier = Modifier.fillMaxWidth().weight(1f))
+            Spacer(modifier = Modifier.fillMaxWidth().weight(1f))
 
-                if (screenState !== ScreenState.NAVIGATING) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onGloballyPositioned { coordinates ->
-                                bottomBarHeight = with(density) { coordinates.size.height.toDp() }
-                            },
-                        color = MaterialTheme.colorScheme.surface
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // Bottom bar
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { bottomBarHeight = with(density) { it.size.height.toDp() } },
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    HorizontalDividerMMD(thickness = 3.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
-                            HorizontalDividerMMD(thickness = 3.dp, color = MaterialTheme.colorScheme.outlineVariant)
-
-                            if (screenState == ScreenState.ROUTE_PREVIEW) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 16.dp, start = 16.dp, end = 16.dp),
-                                    horizontalArrangement = Arrangement.SpaceEvenly
-                                ) {
-                                    val isDriving = transportMode == DirectionsCriteria.PROFILE_DRIVING_TRAFFIC
-                                    IconButton(
-                                        onClick = {
-                                            transportMode = DirectionsCriteria.PROFILE_DRIVING_TRAFFIC
-                                            fetchRoute()
-                                        },
-                                        modifier = Modifier
-                                            .size(56.dp)
-                                            .background(
-                                                color = if (isDriving) MaterialTheme.colorScheme.onSurface else ComposeColor.Transparent,
-                                                shape = CircleShape
-                                            )
-                                            .border(
-                                                width = 2.dp,
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                shape = CircleShape
-                                            )
-                                    ) {
-                                        Icon(
-                                            Icons.Outlined.DirectionsCar,
-                                            contentDescription = "Driving",
-                                            tint = if (isDriving) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.size(32.dp)
-                                        )
-                                    }
-
-                                    val isCycling = transportMode == DirectionsCriteria.PROFILE_CYCLING
-                                    IconButton(
-                                        onClick = {
-                                            transportMode = DirectionsCriteria.PROFILE_CYCLING
-                                            fetchRoute()
-                                        },
-                                        modifier = Modifier
-                                            .size(56.dp)
-                                            .background(
-                                                color = if (isCycling) MaterialTheme.colorScheme.onSurface else ComposeColor.Transparent,
-                                                shape = CircleShape
-                                            )
-                                            .border(
-                                                width = 2.dp,
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                shape = CircleShape
-                                            )
-                                    ) {
-                                        Icon(
-                                            Icons.Outlined.DirectionsBike,
-                                            contentDescription = "Cycling",
-                                            tint = if (isCycling) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.size(32.dp)
-                                        )
-                                    }
-
-                                    val isWalking = transportMode == DirectionsCriteria.PROFILE_WALKING
-                                    IconButton(
-                                        onClick = {
-                                            transportMode = DirectionsCriteria.PROFILE_WALKING
-                                            fetchRoute()
-                                        },
-                                        modifier = Modifier
-                                            .size(56.dp)
-                                            .background(
-                                                color = if (isWalking) MaterialTheme.colorScheme.onSurface else ComposeColor.Transparent,
-                                                shape = CircleShape
-                                            )
-                                            .border(
-                                                width = 2.dp,
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                shape = CircleShape
-                                            )
-                                    ) {
-                                        Icon(
-                                            Icons.Outlined.DirectionsWalk,
-                                            contentDescription = "Walking",
-                                            tint = if (isWalking) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.size(32.dp)
-                                        )
-                                    }
-                                }
+                    if (screenState == ScreenState.ROUTE_PREVIEW) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 16.dp, start = 16.dp, end = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            val isDriving = transportMode == DirectionsCriteria.PROFILE_DRIVING_TRAFFIC
+                            IconButton(
+                                onClick = { transportMode = DirectionsCriteria.PROFILE_DRIVING_TRAFFIC; fetchRoute() },
+                                modifier = Modifier.size(56.dp)
+                                    .background(if (isDriving) MaterialTheme.colorScheme.onSurface else ComposeColor.Transparent, CircleShape)
+                                    .border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                            ) {
+                                Icon(Icons.Outlined.DirectionsCar, "Driving",
+                                    tint = if (isDriving) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(32.dp))
                             }
-
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                OutlinedButtonMMD(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    onClick = {
-                                        when (screenState) {
-                                            ScreenState.POI_OVERVIEW -> fetchRoute()
-                                            ScreenState.ROUTE_PREVIEW -> {
-                                                startNavigation()
-                                            } else -> {null}
-                                        }
-                                    },
-                                    enabled = !isLoading && errorMessage == null,
-                                    contentPadding = PaddingValues(16.dp),
-                                ) {
-                                    Icon(
-                                        imageVector = if (isLoading) {
-                                            Icons.Outlined.LocationSearching
-                                        } else {
-                                            Icons.Outlined.Directions
-                                        },
-                                        "End Navigation",
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .padding(end = 8.dp)
-                                    )
-
-                                    Text(
-                                        text = if (isLoading) {
-                            if (useDeviceLocation) "Getting your location..." else "Getting directions..."
-                                        } else {
-                                            when (screenState) {
-                                                ScreenState.POI_OVERVIEW -> "Get Directions"
-                                                ScreenState.ROUTE_PREVIEW -> "Start Navigation"
-                                                else -> {""}
-                                            }
-                                        },
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-
-                                if (errorMessage != null) {
-                                    Text(errorMessage!!, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
-                                }
+                            val isCycling = transportMode == DirectionsCriteria.PROFILE_CYCLING
+                            IconButton(
+                                onClick = { transportMode = DirectionsCriteria.PROFILE_CYCLING; fetchRoute() },
+                                modifier = Modifier.size(56.dp)
+                                    .background(if (isCycling) MaterialTheme.colorScheme.onSurface else ComposeColor.Transparent, CircleShape)
+                                    .border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                            ) {
+                                Icon(Icons.Outlined.DirectionsBike, "Cycling",
+                                    tint = if (isCycling) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(32.dp))
+                            }
+                            val isWalking = transportMode == DirectionsCriteria.PROFILE_WALKING
+                            IconButton(
+                                onClick = { transportMode = DirectionsCriteria.PROFILE_WALKING; fetchRoute() },
+                                modifier = Modifier.size(56.dp)
+                                    .background(if (isWalking) MaterialTheme.colorScheme.onSurface else ComposeColor.Transparent, CircleShape)
+                                    .border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                            ) {
+                                Icon(Icons.Outlined.DirectionsWalk, "Walking",
+                                    tint = if (isWalking) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(32.dp))
                             }
                         }
                     }
-                } else if (screenState == ScreenState.NAVIGATING) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onGloballyPositioned { coordinates ->
-                                bottomBarHeight = with(density) { coordinates.size.height.toDp() }
+
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        val canNavigate = useDeviceLocation || useActualLocationForSession
+                        OutlinedButtonMMD(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = {
+                                when (screenState) {
+                                    ScreenState.POI_OVERVIEW -> fetchRoute()
+                                    ScreenState.ROUTE_PREVIEW -> if (canNavigate) requestNavigationStart()
+                                }
                             },
-                        color = MaterialTheme.colorScheme.surface
-                    ) {
-                        Column {
-                            HorizontalDividerMMD(thickness = 3.dp, color = MaterialTheme.colorScheme.outlineVariant)
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 4.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                IconButton(
-                                    modifier = Modifier.size(48.dp),
-                                    onClick = {
-                                        isMuted = !isMuted
-                                        if (isMuted) {
-                                            speechApi.cancel()
-                                            voiceInstructionsPlayer.clear()
-                                        }
+                            enabled = !isLoading && errorMessage == null &&
+                                (screenState == ScreenState.POI_OVERVIEW || canNavigate),
+                            contentPadding = PaddingValues(16.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (isLoading) Icons.Outlined.LocationSearching else Icons.Outlined.Directions,
+                                contentDescription = "Directions",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(32.dp).padding(end = 8.dp)
+                            )
+                            Text(
+                                text = if (isLoading) {
+                                    if (canNavigate) "Getting your location..." else "Getting directions..."
+                                } else {
+                                    when (screenState) {
+                                        ScreenState.POI_OVERVIEW -> "Get Directions"
+                                        ScreenState.ROUTE_PREVIEW -> if (canNavigate) "Start Navigation" else "Preview only"
                                     }
-                                ) {
-                                    Icon(
-                                        if (isMuted) Icons.Outlined.VolumeOff else Icons.Outlined.VolumeUp,
-                                        contentDescription = if (isMuted) "Unmute" else "Mute",
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                }
-
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = routeTime,
-                                        fontSize = 20.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = routeDistance,
-                                            fontSize = 14.sp,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "•",
-                                            fontSize = 14.sp,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = routeEta,
-                                            fontSize = 14.sp,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
-
-                                IconButton(
-                                    modifier = Modifier.size(48.dp),
-                                    onClick = {
-                                        stopNavigationSession()
-                                    }
-                                ) {
-                                    Icon(
-                                        Icons.Outlined.Clear,
-                                        "End Navigation",
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                }
-                            }
+                                },
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        if (errorMessage != null) {
+                            Text(errorMessage!!, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
                         }
                     }
                 }
@@ -1246,67 +660,12 @@ private fun VerticalDottedLine(
         val spacing = 4.dp.toPx()
         val centerX = size.width / 2f
         val dotDiameter = dotRadius * 2
-        val edgePadding = dotDiameter
-        var y = edgePadding
-        val maxY = size.height - edgePadding
+        var y = dotDiameter
+        val maxY = size.height - dotDiameter
         while (y <= maxY) {
-            drawCircle(
-                color = color,
-                radius = dotRadius,
-                center = Offset(centerX, y)
-            )
+            drawCircle(color = color, radius = dotRadius, center = Offset(centerX, y))
             y += dotDiameter + spacing
         }
-    }
-}
-
-@Composable
-fun rememberLocationPuckBitmap(): Bitmap {
-    val context = LocalContext.current
-    return remember(context) {
-        val density = context.resources.displayMetrics.density
-        val sizePx = (48 * density).toInt()
-        val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
-
-        val canvas = AndroidCanvas(bitmap)
-
-        val cx = sizePx / 2f
-        val cy = sizePx / 2f
-        val outlineWidth = 4 * density
-        val radius = (sizePx / 2f) - (outlineWidth / 2)
-
-        val circlePaint = Paint().apply {
-            isAntiAlias = true
-            style = Paint.Style.FILL
-            color = AndroidColor.WHITE
-        }
-        canvas.drawCircle(cx, cy, radius, circlePaint)
-
-        val borderPaint = Paint().apply {
-            isAntiAlias = true
-            style = Paint.Style.STROKE
-            color = AndroidColor.BLACK
-            strokeWidth = outlineWidth
-        }
-        canvas.drawCircle(cx, cy, radius, borderPaint)
-
-        val arrowPaint = Paint().apply {
-            isAntiAlias = true
-            style = Paint.Style.FILL
-            color = AndroidColor.BLACK
-        }
-
-        val path = Path()
-        val arrowSize = radius * 1.2f
-
-        path.moveTo(cx, cy - (arrowSize / 2))
-        path.lineTo(cx + (arrowSize / 2.5f), cy + (arrowSize / 2))
-        path.lineTo(cx, cy + (arrowSize / 4))
-        path.lineTo(cx - (arrowSize / 2.5f), cy + (arrowSize / 2))
-        path.close()
-
-        canvas.drawPath(path, arrowPaint)
-        bitmap
     }
 }
 
@@ -1318,42 +677,22 @@ fun rememberMarkerBitmap(): Bitmap? {
         val height = 76
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = AndroidCanvas(bitmap)
-
-        val fillPaint = Paint().apply {
-            isAntiAlias = true
-            style = Paint.Style.FILL
-            color = AndroidColor.WHITE
-        }
+        val fillPaint = Paint().apply { isAntiAlias = true; style = Paint.Style.FILL; color = AndroidColor.WHITE }
         val strokePaint = Paint().apply {
-            isAntiAlias = true
-            style = Paint.Style.STROKE
-            strokeWidth = 4f
-            color = AndroidColor.BLACK
-            strokeJoin = Paint.Join.ROUND
+            isAntiAlias = true; style = Paint.Style.STROKE; strokeWidth = 4f
+            color = AndroidColor.BLACK; strokeJoin = Paint.Join.ROUND
         }
-        val dotPaint = Paint().apply {
-            isAntiAlias = true
-            style = Paint.Style.FILL
-            color = AndroidColor.BLACK
-        }
-
+        val dotPaint = Paint().apply { isAntiAlias = true; style = Paint.Style.FILL; color = AndroidColor.BLACK }
         val cx = width / 2f
         val cy = width / 2f - 4f
         val radius = 24f
-        val tipY = height - 4f
-
         val path = Path()
-
-        val rect = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
-        path.arcTo(rect, 150f, 240f)
-        path.lineTo(cx, tipY)
-
+        path.arcTo(RectF(cx - radius, cy - radius, cx + radius, cy + radius), 150f, 240f)
+        path.lineTo(cx, height - 4f)
         path.close()
-
         canvas.drawPath(path, fillPaint)
         canvas.drawPath(path, strokePaint)
         canvas.drawCircle(cx, cy, 8f, dotPaint)
-
         bitmap
     }
 }

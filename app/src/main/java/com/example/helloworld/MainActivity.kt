@@ -81,11 +81,13 @@ class MainActivity : ComponentActivity() {
                     val searchViewModel: SearchViewModel = viewModel()
                     val focusRequester = remember { FocusRequester() }
                     val currentRoute = navBackStackEntry?.destination?.route
-                    val isFullScreenMapRoute = currentRoute?.startsWith("map?") == true
+                    val isFullScreenMapRoute = currentRoute?.startsWith("map?") == true ||
+                        currentRoute?.startsWith("navigation_active?") == true
 
                     Scaffold(
                         topBar = {
-                            if (!isFullScreenMapRoute && !isPipMode && currentRoute != "offline_selector") {
+                            if (!isFullScreenMapRoute && !isPipMode && currentRoute != "offline_selector" &&
+                                currentRoute?.startsWith("navigation_active?") != true) {
                                 DirectoryTopAppBar(
                                     navController = navController,
                                     navBackStackEntry = navBackStackEntry,
@@ -160,6 +162,18 @@ class MainActivity : ComponentActivity() {
                                     autoOpen = autoOpen,
                                     searchViewModel = searchViewModel
                                 )
+                            }
+
+                            composable(
+                                "navigation_active?lat={lat}&lng={lng}",
+                                arguments = listOf(
+                                    navArgument("lat") { type = NavType.FloatType },
+                                    navArgument("lng") { type = NavType.FloatType }
+                                )
+                            ) { backStackEntry ->
+                                val poiLat: Double = backStackEntry.arguments?.getFloat("lat")?.toDouble() ?: 0.0
+                                val poiLng: Double = backStackEntry.arguments?.getFloat("lng")?.toDouble() ?: 0.0
+                                ActiveNavigationScreen(navController, poiLat, poiLng)
                             }
 
                             composable(
