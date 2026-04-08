@@ -16,6 +16,7 @@ import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.activity.compose.BackHandler
@@ -243,6 +244,16 @@ fun NavigationScreen(
             if (!currentIsMuted) {
                 speechApi.generate(voiceInstructions, speechCallback)
             }
+        }
+    }
+
+    DisposableEffect(screenState) {
+        val window = context.findActivity()?.window
+        if (screenState == ScreenState.NAVIGATING) {
+            window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
     }
 
