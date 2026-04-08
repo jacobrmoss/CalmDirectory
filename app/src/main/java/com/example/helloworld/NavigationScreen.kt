@@ -187,10 +187,26 @@ fun NavigationScreen(
     val locationService = remember { LocationService(context) }
     val userPreferencesRepository = remember { UserPreferencesRepository(context) }
     val distanceUnit by userPreferencesRepository.distanceUnit.collectAsState(initial = DistanceUnit.IMPERIAL)
+    val useDeviceLocation by userPreferencesRepository.useDeviceLocation.collectAsState(initial = true)
+    val defaultLocation by userPreferencesRepository.defaultLocation.collectAsState(initial = null)
+    val geocodingService = remember { HereGeocodingService(userPreferencesRepository) }
 
     var currentUserLocation by remember { mutableStateOf<android.location.Location?>(null) }
-    LaunchedEffect(Unit) {
-        currentUserLocation = locationService.getBestLocationOrNull()
+    LaunchedEffect(useDeviceLocation, defaultLocation) {
+        currentUserLocation = if (useDeviceLocation) {
+            locationService.getBestLocationOrNull()
+        } else {
+            val loc = defaultLocation
+            if (loc != null) {
+                val coords = geocodingService.getCoordinates(loc)
+                coords?.let { (lat, lng) ->
+                    android.location.Location("default").apply {
+                        latitude = lat
+                        longitude = lng
+                    }
+                }
+            } else null
+        }
     }
 
     val mapboxNavigation = remember(context) {
@@ -357,13 +373,31 @@ fun NavigationScreen(
             errorMessage = null
 
             try {
-                val bestLocation = locationService.getCurrentLocation()
-                val originPoint = if (bestLocation != null) {
-                    originLabel = "Current location"
-                    Point.fromLngLat(bestLocation.longitude, bestLocation.latitude)
+                val originPoint: Point? = if (useDeviceLocation) {
+                    val bestLocation = locationService.getCurrentLocation()
+                    if (bestLocation != null) {
+                        originLabel = "Current location"
+                        Point.fromLngLat(bestLocation.longitude, bestLocation.latitude)
+                    } else {
+                        originLabel = "Location unavailable"
+                        null
+                    }
                 } else {
-                    originLabel = "Location unavailable"
-                    null
+                    val loc = defaultLocation
+                    if (loc != null) {
+                        val coords = geocodingService.getCoordinates(loc)
+                        if (coords != null) {
+                            originLabel = loc
+                            Point.fromLngLat(coords.second, coords.first)
+                        } else {
+                            originLabel = "Location unavailable"
+                            null
+                        }
+                    } else {
+                        errorMessage = "No default location set. Please configure one in Settings."
+                        isLoading = false
+                        return@launch
+                    }
                 }
 
                 if (originPoint == null) {
@@ -1094,7 +1128,7 @@ fun NavigationScreen(
 
                                     Text(
                                         text = if (isLoading) {
-                                            "Getting your location..."
+                            if (useDeviceLocation) "Getting your location..." else "Getting directions..."
                                         } else {
                                             when (screenState) {
                                                 ScreenState.POI_OVERVIEW -> "Get Directions"
