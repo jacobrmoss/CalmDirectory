@@ -36,7 +36,7 @@ class NavigationOverlayService : Service() {
             startForeground(
                 2256,
                 notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             )
         } else {
             startForeground(2256, notification)
