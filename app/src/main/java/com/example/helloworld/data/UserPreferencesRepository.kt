@@ -79,6 +79,18 @@ class UserPreferencesRepository(
             settings[QUICK_LOCATIONS] = Json.encodeToString(currentList)
         }
     }
+
+    suspend fun removeQuickLocation(id: String) {
+        context.dataStore.edit { settings ->
+            val currentJson = settings[QUICK_LOCATIONS] ?: "[]"
+            val currentList: List<QuickLocation> = try {
+                Json.decodeFromString<List<QuickLocation>>(currentJson)
+            } catch (e: Exception) {
+                emptyList()
+            }
+            settings[QUICK_LOCATIONS] = Json.encodeToString(currentList.filter { it.id != id })
+        }
+    }
     suspend fun saveUseDeviceLocation(useDeviceLocation: Boolean) {
         context.dataStore.edit { settings -> settings[USE_DEVICE_LOCATION] = useDeviceLocation }
     }

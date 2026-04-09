@@ -50,6 +50,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.helloworld.data.DistanceUnit
 import com.example.helloworld.data.UserPreferencesRepository
+import com.mudita.mmd.components.bottom_sheet.ModalBottomSheetMMD
 import com.mudita.mmd.components.buttons.ButtonMMD
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import com.mudita.mmd.components.lazy.LazyColumnMMD
@@ -60,6 +61,7 @@ import com.mudita.mmd.components.snackbar.SnackbarHostMMD
 import com.mudita.mmd.components.snackbar.SnackbarHostStateMMD
 import com.mudita.mmd.components.switcher.SwitchMMD
 import com.mudita.mmd.components.tabs.PrimaryTabRowMMD
+import com.mudita.mmd.components.text_field.TextFieldMMD
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -132,6 +134,25 @@ fun SettingsScreen(
     LaunchedEffect(isEditingLocation, locationSuggestions) {
         if (isEditingLocation && locationSuggestions.isNotEmpty()) {
             suggestionsBringIntoViewRequester.bringIntoView()
+        }
+    }
+
+    val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
+    val selectedLabel by savedStateHandle?.getStateFlow<String?>("selected_label", null)?.collectAsState() ?: remember { mutableStateOf(null) }
+    val selectedAddress by savedStateHandle?.getStateFlow<String?>("selected_address", null)?.collectAsState() ?: remember { mutableStateOf(null) }
+
+    var showQuickLocationNameDialog by remember { mutableStateOf(false) }
+    var quickLocationName by remember { mutableStateOf("") }
+    var pendingQuickLocationAddress by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(selectedAddress) {
+        if (selectedAddress != null && selectedLabel != null) {
+            selectedTabIndex = 1
+            quickLocationName = ""
+            pendingQuickLocationAddress = selectedAddress!!
+            showQuickLocationNameDialog = true
+            savedStateHandle?.remove<String>("selected_label")
+            savedStateHandle?.remove<String>("selected_address")
         }
     }
 
@@ -368,11 +389,12 @@ fun SettingsScreen(
                                                 Text(location.label, fontWeight = FontWeight.SemiBold)
                                                 Text(location.address, fontSize = 14.sp)
                                             }
-                                            IconButton(onClick = {
-                                                coroutineScope.launch {
-                                                    // Implementation for removing a specific quick location
-                                                }
-                                            }) {
+                            IconButton(onClick = {
+                                coroutineScope.launch {
+                                    userPreferencesRepository.removeQuickLocation(location.id)
+                                    snackbarHostState.showSnackbar("Location removed")
+                                }
+                            }) {
                                                 Icon(Icons.Sharp.Clear, "Remove Location")
                                             }
                                         }
@@ -453,5 +475,40 @@ fun SettingsScreen(
                 .align(Alignment.BottomCenter)
                 .padding(16.dp)
         )
+    }
+
+    if (showQuickLocationNameDialog) {
+        ModalBottomSheetMMD(onDismissRequest = { showQuickLocationNameDialog = false }) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Name this Quick Location", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(16.dp))
+                TextFieldMMD(
+                    value = quickLocationName,
+                    onValueChange = { quickLocationName = it },
+                    label = { Text("Location Name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(pendingQuickLocationAddress ?: "", fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(16.dp))
+                ButtonMMD(
+                    onClick = {
+                        showQuickLocationNameDialog = false
+                        coroutineScope.launch {
+                            userPreferencesRepository.addQuickLocation(
+                                label = quickLocationName.ifBlank { pendingQuickLocationAddress ?: "" },
+                                address = pendingQuickLocationAddress ?: ""
+                            )
+                            pendingQuickLocationAddress = null
+                            snackbarHostState.showSnackbar("Quick location added")
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Save")
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
     }
 }

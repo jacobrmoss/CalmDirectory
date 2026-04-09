@@ -435,7 +435,7 @@ fun ActiveNavigationScreen(
         // PIP mode: only the maneuver view is shown
         if (isPipMode) {
             Box(
-                modifier = Modifier.fillMaxSize().background(Color.Black),
+                modifier = Modifier.fillMaxSize().background(Color.Black).zIndex(3f),
                 contentAlignment = Alignment.Center
             ) {
                 AndroidView(
@@ -481,9 +481,9 @@ fun ActiveNavigationScreen(
             }
         }
 
-        // Map — hidden in PIP, full-screen during navigation
+        // Map — kept full-size in PIP so the GL surface stays alive
         val mapModifier = if (isPipMode) {
-            Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0f).zIndex(1f)
+            Modifier.fillMaxSize().zIndex(1f)
         } else {
             Modifier.fillMaxSize().padding(top = topBarHeight, bottom = bottomBarHeight).zIndex(0f)
         }
@@ -566,11 +566,12 @@ fun ActiveNavigationScreen(
                                 val view = LayoutInflater.from(wrappedCtx)
                                     .inflate(R.layout.view_maneuver, null, false) as MapboxManeuverView
                                 val whiteRes = android.R.color.white
+                                val blackRes = android.R.color.black
                                 val blackStyle = R.style.ManeuverTextAppearance
                                 view.updateManeuverViewOptions(
                                     ManeuverViewOptions.Builder()
                                         .maneuverBackgroundColor(whiteRes)
-                                        .subManeuverBackgroundColor(whiteRes)
+                                        .subManeuverBackgroundColor(blackRes)
                                         .upcomingManeuverBackgroundColor(whiteRes)
                                         .stepDistanceTextAppearance(blackStyle)
                                         .turnIconManeuver(R.style.MapboxCustomManeuverTurnIconStyle)

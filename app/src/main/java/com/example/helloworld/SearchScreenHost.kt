@@ -30,6 +30,7 @@ fun SearchScreenHost(
     val handlePoiSelection: (Poi) -> Unit = { poi ->
         if (saveAs == "NEW_QUICK_LOCATION") {
             val addressString = "${poi.address.street}, ${poi.address.city}, ${poi.address.state} ${poi.address.zip}, ${poi.address.country}"
+            navController.previousBackStackEntry?.savedStateHandle?.set("selected_label", poi.name)
             navController.previousBackStackEntry?.savedStateHandle?.set("selected_address", addressString)
             navController.popBackStack()
         } else {
