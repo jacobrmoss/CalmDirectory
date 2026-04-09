@@ -104,6 +104,10 @@ import com.mapbox.navigation.ui.maps.route.line.model.RouteLineColorResources
 import com.mudita.mmd.components.buttons.OutlinedButtonMMD
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 private enum class ScreenState {
     POI_OVERVIEW,
@@ -163,6 +167,7 @@ fun NavigationScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var originLabel by remember { mutableStateOf("Locating...") }
     var transportMode by remember { mutableStateOf(DirectionsCriteria.PROFILE_DRIVING_TRAFFIC) }
+    var routeDurationSeconds by remember { mutableStateOf(0.0) }
     // Session-only GPS override: true when the user taps "Use current location"
     // in the route preview. Does not change the global preference.
     var useActualLocationForSession by remember { mutableStateOf(false) }
@@ -360,12 +365,15 @@ fun NavigationScreen(
                     }
                 }
                 if (result.navigationRoutes.isNotEmpty()) {
+                    routeDurationSeconds = result.navigationRoutes[0].directionsRoute.duration()
                     viewportDataSource?.onRouteChanged(result.navigationRoutes[0])
                     viewportDataSource?.evaluate()
                     if (screenState == ScreenState.POI_OVERVIEW) {
                         screenState = ScreenState.ROUTE_PREVIEW
                     }
                     navigationCamera?.requestNavigationCameraToOverview()
+                } else {
+                    routeDurationSeconds = 0.0
                 }
             }
 
@@ -570,40 +578,60 @@ fun NavigationScreen(
                     if (screenState == ScreenState.ROUTE_PREVIEW) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(top = 16.dp, start = 16.dp, end = 16.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val isDriving = transportMode == DirectionsCriteria.PROFILE_DRIVING_TRAFFIC
-                            IconButton(
-                                onClick = { transportMode = DirectionsCriteria.PROFILE_DRIVING_TRAFFIC; fetchRoute() },
-                                modifier = Modifier.size(56.dp)
-                                    .background(if (isDriving) MaterialTheme.colorScheme.onSurface else ComposeColor.Transparent, CircleShape)
-                                    .border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                            ) {
-                                Icon(Icons.Outlined.DirectionsCar, "Driving",
-                                    tint = if (isDriving) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(32.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                val isDriving = transportMode == DirectionsCriteria.PROFILE_DRIVING_TRAFFIC
+                                IconButton(
+                                    onClick = { transportMode = DirectionsCriteria.PROFILE_DRIVING_TRAFFIC; fetchRoute() },
+                                    modifier = Modifier.size(40.dp)
+                                        .background(if (isDriving) MaterialTheme.colorScheme.onSurface else ComposeColor.Transparent, CircleShape)
+                                        .border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                ) {
+                                    Icon(Icons.Outlined.DirectionsCar, "Driving",
+                                        tint = if (isDriving) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(22.dp))
+                                }
+                                val isCycling = transportMode == DirectionsCriteria.PROFILE_CYCLING
+                                IconButton(
+                                    onClick = { transportMode = DirectionsCriteria.PROFILE_CYCLING; fetchRoute() },
+                                    modifier = Modifier.size(40.dp)
+                                        .background(if (isCycling) MaterialTheme.colorScheme.onSurface else ComposeColor.Transparent, CircleShape)
+                                        .border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                ) {
+                                    Icon(Icons.Outlined.DirectionsBike, "Cycling",
+                                        tint = if (isCycling) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(22.dp))
+                                }
+                                val isWalking = transportMode == DirectionsCriteria.PROFILE_WALKING
+                                IconButton(
+                                    onClick = { transportMode = DirectionsCriteria.PROFILE_WALKING; fetchRoute() },
+                                    modifier = Modifier.size(40.dp)
+                                        .background(if (isWalking) MaterialTheme.colorScheme.onSurface else ComposeColor.Transparent, CircleShape)
+                                        .border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                ) {
+                                    Icon(Icons.Outlined.DirectionsWalk, "Walking",
+                                        tint = if (isWalking) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(22.dp))
+                                }
                             }
-                            val isCycling = transportMode == DirectionsCriteria.PROFILE_CYCLING
-                            IconButton(
-                                onClick = { transportMode = DirectionsCriteria.PROFILE_CYCLING; fetchRoute() },
-                                modifier = Modifier.size(56.dp)
-                                    .background(if (isCycling) MaterialTheme.colorScheme.onSurface else ComposeColor.Transparent, CircleShape)
-                                    .border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                            ) {
-                                Icon(Icons.Outlined.DirectionsBike, "Cycling",
-                                    tint = if (isCycling) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(32.dp))
-                            }
-                            val isWalking = transportMode == DirectionsCriteria.PROFILE_WALKING
-                            IconButton(
-                                onClick = { transportMode = DirectionsCriteria.PROFILE_WALKING; fetchRoute() },
-                                modifier = Modifier.size(56.dp)
-                                    .background(if (isWalking) MaterialTheme.colorScheme.onSurface else ComposeColor.Transparent, CircleShape)
-                                    .border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                            ) {
-                                Icon(Icons.Outlined.DirectionsWalk, "Walking",
-                                    tint = if (isWalking) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(32.dp))
+
+                            Spacer(modifier = Modifier.weight(1f))
+
+                            if (routeDurationSeconds > 0 && !isLoading) {
+                                val totalSec = routeDurationSeconds.toLong()
+                                val hours = TimeUnit.SECONDS.toHours(totalSec)
+                                val minutes = TimeUnit.SECONDS.toMinutes(totalSec) % 60
+                                val durationLabel = buildString {
+                                    if (hours > 0) append("$hours hr ")
+                                    append("$minutes min")
+                                }
+                                val cal = Calendar.getInstance().also { it.add(Calendar.SECOND, totalSec.toInt()) }
+                                val etaLabel = SimpleDateFormat("h:mm a", Locale.getDefault()).format(cal.time)
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(durationLabel, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                    Text(etaLabel, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                             }
                         }
                     }

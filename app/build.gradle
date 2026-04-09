@@ -20,8 +20,8 @@ android {
         applicationId "com.calmapps.calmmaps"
         minSdk 28
         targetSdk 35
-        versionCode 6
-        versionName "2.4"
+        versionCode 7
+        versionName "2.5"
 
         buildConfigField "String", "HERE_API_KEY", "\"${localProperties.getProperty('HERE_API_KEY', '')}\""
 
