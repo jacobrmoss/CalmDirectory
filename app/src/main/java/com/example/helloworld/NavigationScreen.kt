@@ -622,23 +622,36 @@ fun NavigationScreen(
                                 (screenState == ScreenState.POI_OVERVIEW || canNavigate),
                             contentPadding = PaddingValues(16.dp),
                         ) {
-                            Icon(
-                                imageVector = if (isLoading) Icons.Outlined.LocationSearching else Icons.Outlined.Directions,
-                                contentDescription = "Directions",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(32.dp).padding(end = 8.dp)
-                            )
-                            Text(
-                                text = if (isLoading) {
-                                    if (canNavigate) "Getting your location..." else "Getting directions..."
-                                } else {
-                                    when (screenState) {
-                                        ScreenState.POI_OVERVIEW -> "Get Directions"
-                                        ScreenState.ROUTE_PREVIEW -> if (canNavigate) "Start Navigation" else "Preview only"
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isLoading) Icons.Outlined.LocationSearching else Icons.Outlined.Directions,
+                                    contentDescription = "Directions",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(32.dp).padding(end = 8.dp)
+                                )
+
+                                Column {
+                                    Text(
+                                        text = if (isLoading) {
+                                            if (canNavigate) "Getting your location..." else "Getting directions..."
+                                        } else {
+                                            when (screenState) {
+                                                ScreenState.POI_OVERVIEW -> "Get Directions"
+                                                ScreenState.ROUTE_PREVIEW -> if (canNavigate) "Start Navigation" else "Preview only"
+                                            }
+                                        },
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+
+                                    if (screenState == ScreenState.ROUTE_PREVIEW && !canNavigate) {
+                                        Text(
+                                            text = "Current location required",
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
                                     }
-                                },
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                                }
+                            }
                         }
                         if (errorMessage != null) {
                             Text(errorMessage!!, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
