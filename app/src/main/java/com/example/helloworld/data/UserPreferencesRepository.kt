@@ -17,6 +17,11 @@ enum class DistanceUnit {
     METRIC
 }
 
+enum class SortMode {
+    RELEVANCE,
+    DISTANCE,
+}
+
 @Serializable
 data class QuickLocation(
     val id: String = java.util.UUID.randomUUID().toString(),
@@ -54,6 +59,25 @@ class UserPreferencesRepository(
                 DistanceUnit.IMPERIAL
             }
         }
+
+    val openNow: Flow<Boolean> = context.dataStore.data
+        .map { it[OPEN_NOW] ?: false }
+
+    val openIn1Hour: Flow<Boolean> = context.dataStore.data
+        .map { it[OPEN_IN_1_HOUR] ?: false }
+
+    val sortMode: Flow<SortMode> = context.dataStore.data
+        .map { prefs ->
+            val stored = prefs[SORT_MODE]
+            try { SortMode.valueOf(stored ?: SortMode.RELEVANCE.name) }
+            catch (_: IllegalArgumentException) { SortMode.RELEVANCE }
+        }
+
+    val showRating: Flow<Boolean> = context.dataStore.data
+        .map { it[SHOW_RATING] ?: true }
+
+    val maxPriceLevel: Flow<Int?> = context.dataStore.data
+        .map { it[MAX_PRICE_LEVEL] }
 
     private val QUICK_LOCATIONS = stringPreferencesKey("quick_locations")
 
@@ -106,11 +130,45 @@ class UserPreferencesRepository(
     suspend fun saveDistanceUnit(unit: DistanceUnit) {
         context.dataStore.edit { settings -> settings[DISTANCE_UNIT] = unit.name }
     }
+
+    suspend fun saveOpenNow(value: Boolean) {
+        context.dataStore.edit { settings ->
+            settings[OPEN_NOW] = value
+            if (value) settings[OPEN_IN_1_HOUR] = false
+        }
+    }
+
+    suspend fun saveOpenIn1Hour(value: Boolean) {
+        context.dataStore.edit { settings ->
+            settings[OPEN_IN_1_HOUR] = value
+            if (value) settings[OPEN_NOW] = false
+        }
+    }
+
+    suspend fun saveSortMode(mode: SortMode) {
+        context.dataStore.edit { settings -> settings[SORT_MODE] = mode.name }
+    }
+
+    suspend fun saveShowRating(value: Boolean) {
+        context.dataStore.edit { settings -> settings[SHOW_RATING] = value }
+    }
+
+    suspend fun saveMaxPriceLevel(level: Int?) {
+        context.dataStore.edit { settings ->
+            if (level == null) settings.remove(MAX_PRICE_LEVEL) else settings[MAX_PRICE_LEVEL] = level
+        }
+    }
+
     private companion object {
         val USE_DEVICE_LOCATION = booleanPreferencesKey("use_device_location")
         val DEFAULT_LOCATION = stringPreferencesKey("default_location")
         val MAP_APP = stringPreferencesKey("map_app")
         val SEARCH_RADIUS = intPreferencesKey("search_radius")
         val DISTANCE_UNIT = stringPreferencesKey("distance_unit")
+        val OPEN_NOW = booleanPreferencesKey("open_now")
+        val OPEN_IN_1_HOUR = booleanPreferencesKey("open_in_1_hour")
+        val SORT_MODE = stringPreferencesKey("sort_mode")
+        val SHOW_RATING = booleanPreferencesKey("show_rating")
+        val MAX_PRICE_LEVEL = intPreferencesKey("max_price_level")
     }
 }
