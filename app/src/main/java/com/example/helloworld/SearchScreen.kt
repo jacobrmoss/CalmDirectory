@@ -56,54 +56,63 @@ fun SearchScreen(
                         fontWeight = FontWeight.Bold
                     )
 
-                    if (showRating && poi.rating != null) {
+                    val priceText = poi.priceLevel?.takeIf { it in 1..4 }?.let { "$".repeat(it) }
+                    val distanceText = poi.distanceMeters?.let {
+                        if (distanceUnit == DistanceUnit.METRIC) formatKilometers(it) else formatMiles(it)
+                    }
+                    val showStars = showRating && poi.rating != null
+                    val tail = listOfNotNull(distanceText, priceText).joinToString(" · ")
+
+                    if (showStars || tail.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(2.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            val stars = decomposeStars(poi.rating)
-                            repeat(stars.full) {
-                                Icon(
-                                    imageVector = Icons.Filled.Star,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp)
-                                )
+                            if (showStars) {
+                                val stars = decomposeStars(poi.rating!!)
+                                repeat(stars.full) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Star,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                                if (stars.half) {
+                                    Icon(
+                                        imageVector = Icons.Filled.StarHalf,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                                repeat(stars.empty) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.StarBorder,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                                if (poi.userRatingCount != null) {
+                                    Spacer(modifier = Modifier.size(4.dp))
+                                    Text(
+                                        text = "(${"%,d".format(poi.userRatingCount)})",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
-                            if (stars.half) {
-                                Icon(
-                                    imageVector = Icons.Filled.StarHalf,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                            repeat(stars.empty) {
-                                Icon(
-                                    imageVector = Icons.Outlined.StarBorder,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                            if (poi.userRatingCount != null) {
-                                Spacer(modifier = Modifier.size(4.dp))
+                            if (showStars && tail.isNotEmpty()) {
                                 Text(
-                                    text = "(${"%,d".format(poi.userRatingCount)})",
+                                    text = " · ",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (tail.isNotEmpty()) {
+                                Text(
+                                    text = tail,
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
-                    }
-
-                    val priceText = poi.priceLevel?.takeIf { it in 1..4 }?.let { "$".repeat(it) }
-                    val distanceText = poi.distanceMeters?.let {
-                        if (distanceUnit == DistanceUnit.METRIC) formatKilometers(it) else formatMiles(it)
-                    }
-                    val secondary = listOfNotNull(priceText, distanceText).joinToString(" · ")
-                    if (secondary.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = secondary,
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))

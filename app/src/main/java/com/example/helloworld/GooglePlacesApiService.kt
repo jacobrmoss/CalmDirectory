@@ -61,6 +61,7 @@ class GooglePlacesApiService(
             Place.Field.RATING,
             Place.Field.USER_RATINGS_TOTAL,
             Place.Field.PRICE_LEVEL,
+            Place.Field.EDITORIAL_SUMMARY,
         )
         val builder = SearchByTextRequest.builder(query, placeFields)
 
@@ -160,6 +161,7 @@ class GooglePlacesApiService(
             userRatingCount = userRatingsTotal,
             priceLevel = priceLevelInt,
             distanceMeters = distance,
+            summary = editorialSummary,
         )
     }
 

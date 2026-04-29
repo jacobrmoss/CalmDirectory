@@ -59,6 +59,10 @@ fun SearchScreenHost(
                     route += if (route.contains("?")) "&" else "?"
                     route += "lat=${poi.lat}&lng=${poi.lng}"
                 }
+                poi.summary?.takeIf { it.isNotBlank() }?.let {
+                    route += if (route.contains("?")) "&" else "?"
+                    route += "poiSummary=${URLEncoder.encode(it, StandardCharsets.UTF_8.toString())}"
+                }
                 navController.navigate(route)
             } else if (poi.lat != null && poi.lng != null) {
                 val encodedName = URLEncoder.encode(poi.name, StandardCharsets.UTF_8.toString())

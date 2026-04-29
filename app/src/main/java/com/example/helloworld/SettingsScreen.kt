@@ -203,7 +203,6 @@ fun SettingsScreen(
                                     onValueChangeFinished = {
                                         coroutineScope.launch {
                                             userPreferencesRepository.saveSearchRadius(sliderValue.toInt())
-                                            snackbarHostState.showSnackbar("Search radius updated")
                                         }
                                     },
                                     valueRange = 1f..20f,
@@ -225,7 +224,7 @@ fun SettingsScreen(
                                 Spacer(modifier = Modifier.padding(4.dp))
 
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                    Text(text = "Open now", fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                    Text(text = "Open now", fontSize = 16.sp, modifier = Modifier.weight(1f))
                                     SwitchMMD(
                                         checked = openNow,
                                         onCheckedChange = { isChecked ->
@@ -235,7 +234,7 @@ fun SettingsScreen(
                                 }
                                 Spacer(modifier = Modifier.padding(4.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                    Text(text = "Open in 1 hour", fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                    Text(text = "Open for the next hour", fontSize = 16.sp, modifier = Modifier.weight(1f))
                                     SwitchMMD(
                                         checked = openIn1Hour,
                                         onCheckedChange = { isChecked ->

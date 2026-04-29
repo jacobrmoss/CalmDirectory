@@ -15,6 +15,7 @@ data class Poi(
     val userRatingCount: Int? = null,
     val priceLevel: Int? = null,
     val distanceMeters: Double? = null,
+    val summary: String? = null,
 )
 
 data class Address(

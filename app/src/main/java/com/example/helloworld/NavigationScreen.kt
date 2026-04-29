@@ -84,6 +84,7 @@ import com.mapbox.maps.MapView
 import com.mapbox.maps.MapboxExperimental
 import com.mapbox.maps.extension.compose.MapEffect
 import com.mapbox.maps.extension.compose.MapboxMap
+import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
 import com.mapbox.maps.extension.compose.annotation.IconImage
 import com.mapbox.maps.extension.compose.annotation.generated.PointAnnotation
 import com.mapbox.maps.extension.style.layers.properties.generated.IconAnchor
@@ -686,6 +687,18 @@ fun NavigationScreen(
                         }
                     }
                 }
+            }
+        }
+
+        if (!isStyleLoaded) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .zIndex(10f),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicatorMMD()
             }
         }
     }

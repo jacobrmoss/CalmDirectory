@@ -198,11 +198,12 @@ class MainActivity : ComponentActivity() {
                             }
 
                             composable(
-                                "details/{poiName}/{poiAddress}/{poiCountry}/{poiPhone}/{poiDescription}/{poiHours}?poiWebsite={poiWebsite}&lat={lat}&lng={lng}",
+                                "details/{poiName}/{poiAddress}/{poiCountry}/{poiPhone}/{poiDescription}/{poiHours}?poiWebsite={poiWebsite}&lat={lat}&lng={lng}&poiSummary={poiSummary}",
                                 arguments = listOf(
                                     navArgument("poiWebsite") { type = NavType.StringType; nullable = true },
                                     navArgument("lat") { type = NavType.FloatType },
-                                    navArgument("lng") { type = NavType.FloatType }
+                                    navArgument("lng") { type = NavType.FloatType },
+                                    navArgument("poiSummary") { type = NavType.StringType; nullable = true; defaultValue = null }
                                 )
                             ) { backStackEntry ->
                                 val poiName = URLDecoder.decode(
@@ -234,8 +235,11 @@ class MainActivity : ComponentActivity() {
                                 val poiLat: Double? = backStackEntry.arguments?.getFloat("lat")?.toDouble()
                                 val poiLng: Double? = backStackEntry.arguments?.getFloat("lng")?.toDouble()
                                 val poiWebsite = backStackEntry.arguments?.getString("poiWebsite")
+                                val poiSummary = backStackEntry.arguments?.getString("poiSummary")?.let {
+                                    URLDecoder.decode(it, StandardCharsets.UTF_8.toString())
+                                }
 
-                                PoiDetailsScreen(poiName, poiAddress, poiCountry, poiPhone, poiDescription, poiHours, poiWebsite, poiLat, poiLng, navController)
+                                PoiDetailsScreen(poiName, poiAddress, poiCountry, poiPhone, poiDescription, poiHours, poiWebsite, poiLat, poiLng, poiSummary, navController)
                             }
                         }
                     }

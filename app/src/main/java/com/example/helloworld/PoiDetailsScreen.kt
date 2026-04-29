@@ -12,6 +12,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -19,6 +21,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -52,6 +56,7 @@ fun PoiDetailsScreen(
     poiWebsite: String?,
     poiLat: Double?,
     poiLng: Double?,
+    poiSummary: String?,
     navController: NavController
 ) {
     val context = LocalContext.current
@@ -64,6 +69,19 @@ fun PoiDetailsScreen(
 
     LaunchedEffect(phone) {
         currentBackStackEntry?.savedStateHandle?.set("effectivePoiPhone", phone)
+    }
+
+    var contentReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(120)
+        contentReady = true
+    }
+
+    if (!contentReady) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicatorMMD()
+        }
+        return
     }
 
     Scaffold(
@@ -128,6 +146,11 @@ fun PoiDetailsScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(text = formatPhoneNumberForCountry(phone, poiCountry))
+
+            if (!poiSummary.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(text = poiSummary)
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 

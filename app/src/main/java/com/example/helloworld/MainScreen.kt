@@ -10,6 +10,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import com.mudita.mmd.components.bottom_sheet.SheetValue
 import androidx.compose.runtime.*
+import kotlinx.coroutines.flow.combine
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -47,6 +48,14 @@ fun MainScreen(
     val useDeviceLocation by userPreferencesRepository.useDeviceLocation.collectAsState(initial = false)
     val defaultLocation by userPreferencesRepository.defaultLocation.collectAsState(initial = null)
 
+    val locationGate by remember(userPreferencesRepository) {
+        userPreferencesRepository.useDeviceLocation
+            .combine(userPreferencesRepository.defaultLocation) { device, def ->
+                if (device || !def.isNullOrBlank()) LocationGate.HasLocation
+                else LocationGate.NeedsLocation
+            }
+    }.collectAsState(initial = LocationGate.Unknown)
+
     val quickLocations by userPreferencesRepository.quickLocations.collectAsState(initial = emptyList())
 
     val bottomSheetState = rememberModalBottomSheetMMDState(
@@ -59,8 +68,8 @@ fun MainScreen(
     var pendingAddress by remember { mutableStateOf("") }
     var newLocationLabel by remember { mutableStateOf("") }
 
-    LaunchedEffect(useDeviceLocation, defaultLocation) {
-        showLocationBottomSheet = !useDeviceLocation && defaultLocation.isNullOrBlank()
+    LaunchedEffect(locationGate) {
+        showLocationBottomSheet = locationGate == LocationGate.NeedsLocation
     }
 
     val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
@@ -76,7 +85,7 @@ fun MainScreen(
         }
     }
 
-    if (isLoading) {
+    if (isLoading || locationGate == LocationGate.Unknown) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -195,3 +204,5 @@ fun MainScreen(
         }
     }
 }
+
+private enum class LocationGate { Unknown, NeedsLocation, HasLocation }
