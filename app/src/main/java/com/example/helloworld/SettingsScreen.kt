@@ -49,6 +49,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.helloworld.data.DistanceUnit
+import com.example.helloworld.data.SortMode
 import com.example.helloworld.data.UserPreferencesRepository
 import com.mudita.mmd.components.bottom_sheet.ModalBottomSheetMMD
 import com.mudita.mmd.components.buttons.ButtonMMD
@@ -86,6 +87,11 @@ fun SettingsScreen(
     var sliderValue by remember(searchRadius) { mutableStateOf(searchRadius.toFloat()) }
 
     val distanceUnit by userPreferencesRepository.distanceUnit.collectAsState(initial = DistanceUnit.IMPERIAL)
+    val openNow by userPreferencesRepository.openNow.collectAsState(initial = false)
+    val openIn1Hour by userPreferencesRepository.openIn1Hour.collectAsState(initial = false)
+    val sortMode by userPreferencesRepository.sortMode.collectAsState(initial = SortMode.RELEVANCE)
+    val showRating by userPreferencesRepository.showRating.collectAsState(initial = true)
+    val maxPriceLevel by userPreferencesRepository.maxPriceLevel.collectAsState(initial = null)
     val quickLocations by userPreferencesRepository.quickLocations.collectAsState(initial = emptyList())
 
     var offlineRegions by remember { mutableStateOf<List<OfflineRegionItem>>(emptyList()) }
@@ -207,6 +213,113 @@ fun SettingsScreen(
                                         .fillMaxWidth()
                                         .padding(vertical = 8.dp)
                                 )
+                                Spacer(modifier = Modifier.padding(8.dp))
+                                HorizontalDividerMMD(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                            }
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.padding(16.dp))
+                            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                                Text(text = "Search filters", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.padding(4.dp))
+
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                    Text(text = "Open now", fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                    SwitchMMD(
+                                        checked = openNow,
+                                        onCheckedChange = { isChecked ->
+                                            coroutineScope.launch { userPreferencesRepository.saveOpenNow(isChecked) }
+                                        }
+                                    )
+                                }
+                                Spacer(modifier = Modifier.padding(4.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                    Text(text = "Open in 1 hour", fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                    SwitchMMD(
+                                        checked = openIn1Hour,
+                                        onCheckedChange = { isChecked ->
+                                            coroutineScope.launch { userPreferencesRepository.saveOpenIn1Hour(isChecked) }
+                                        }
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.padding(8.dp))
+                                Text(text = "Sort by", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            coroutineScope.launch { userPreferencesRepository.saveSortMode(SortMode.RELEVANCE) }
+                                        }
+                                ) {
+                                    RadioButtonMMD(
+                                        selected = sortMode == SortMode.RELEVANCE,
+                                        onClick = null,
+                                        modifier = Modifier.semantics { contentDescription = "Relevance" }
+                                    )
+                                    Text(text = "Relevance", modifier = Modifier.padding(start = 8.dp))
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 4.dp)
+                                        .clickable {
+                                            coroutineScope.launch { userPreferencesRepository.saveSortMode(SortMode.DISTANCE) }
+                                        }
+                                ) {
+                                    RadioButtonMMD(
+                                        selected = sortMode == SortMode.DISTANCE,
+                                        onClick = null,
+                                        modifier = Modifier.semantics { contentDescription = "Distance" }
+                                    )
+                                    Text(text = "Distance", modifier = Modifier.padding(start = 8.dp))
+                                }
+
+                                Spacer(modifier = Modifier.padding(8.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                    Text(text = "Show ratings", fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                    SwitchMMD(
+                                        checked = showRating,
+                                        onCheckedChange = { isChecked ->
+                                            coroutineScope.launch { userPreferencesRepository.saveShowRating(isChecked) }
+                                        }
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.padding(8.dp))
+                                Text(text = "Max price", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                Spacer(modifier = Modifier.padding(2.dp))
+                                Row(modifier = Modifier.fillMaxWidth()) {
+                                    val priceOptions: List<Pair<Int?, String>> = listOf(
+                                        null to "Any",
+                                        1 to "$",
+                                        2 to "$$",
+                                        3 to "$$$",
+                                        4 to "$$$$",
+                                    )
+                                    priceOptions.forEach { (level, label) ->
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clickable {
+                                                    coroutineScope.launch { userPreferencesRepository.saveMaxPriceLevel(level) }
+                                                }
+                                                .padding(vertical = 8.dp)
+                                        ) {
+                                            RadioButtonMMD(
+                                                selected = maxPriceLevel == level,
+                                                onClick = null,
+                                                modifier = Modifier.semantics { contentDescription = "Max price $label" }
+                                            )
+                                            Text(text = label, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp))
+                                        }
+                                    }
+                                }
+
                                 Spacer(modifier = Modifier.padding(8.dp))
                                 HorizontalDividerMMD(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
                             }
