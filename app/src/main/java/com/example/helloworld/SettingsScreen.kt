@@ -26,6 +26,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -306,32 +309,28 @@ fun SettingsScreen(
 
                                 Spacer(modifier = Modifier.padding(8.dp))
                                 Text(text = "Max price", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                Spacer(modifier = Modifier.padding(2.dp))
-                                Row(modifier = Modifier.fillMaxWidth()) {
-                                    val priceOptions: List<Pair<Int?, String>> = listOf(
-                                        null to "Any",
-                                        1 to "$",
-                                        2 to "$$",
-                                        3 to "$$$",
-                                        4 to "$$$$",
-                                    )
-                                    priceOptions.forEach { (level, label) ->
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clickable {
-                                                    coroutineScope.launch { userPreferencesRepository.saveMaxPriceLevel(level) }
-                                                }
-                                                .padding(vertical = 8.dp)
-                                        ) {
-                                            RadioButtonMMD(
-                                                selected = maxPriceLevel == level,
-                                                onClick = null,
-                                                modifier = Modifier.semantics { contentDescription = "Max price $label" }
-                                            )
-                                            Text(text = label, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp))
-                                        }
+                                Spacer(modifier = Modifier.padding(4.dp))
+                                val priceOptions: List<Pair<Int?, String>> = listOf(
+                                    null to "Any",
+                                    1 to "$",
+                                    2 to "$$",
+                                    3 to "$$$",
+                                    4 to "$$$$",
+                                )
+                                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                    priceOptions.forEachIndexed { index, (level, label) ->
+                                        SegmentedButton(
+                                            selected = maxPriceLevel == level,
+                                            onClick = {
+                                                coroutineScope.launch { userPreferencesRepository.saveMaxPriceLevel(level) }
+                                            },
+                                            shape = SegmentedButtonDefaults.itemShape(
+                                                index = index,
+                                                count = priceOptions.size
+                                            ),
+                                            label = { Text(label) },
+                                            modifier = Modifier.semantics { contentDescription = "Max price $label" }
+                                        )
                                     }
                                 }
 
