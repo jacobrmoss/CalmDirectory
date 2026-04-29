@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -329,6 +330,13 @@ fun SettingsScreen(
                                                 count = priceOptions.size
                                             ),
                                             label = { Text(label) },
+                                            icon = {},
+                                            colors = SegmentedButtonDefaults.colors(
+                                                activeContainerColor = Color.Black,
+                                                activeContentColor = Color.White,
+                                                inactiveContainerColor = Color.White,
+                                                inactiveContentColor = Color.Black,
+                                            ),
                                             modifier = Modifier.semantics { contentDescription = "Max price $label" }
                                         )
                                     }
