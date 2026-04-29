@@ -276,6 +276,22 @@ fun SettingsScreen(
                                     )
                                     Text(text = "Distance", modifier = Modifier.padding(start = 8.dp))
                                 }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 4.dp)
+                                        .clickable {
+                                            coroutineScope.launch { userPreferencesRepository.saveSortMode(SortMode.RATING) }
+                                        }
+                                ) {
+                                    RadioButtonMMD(
+                                        selected = sortMode == SortMode.RATING,
+                                        onClick = null,
+                                        modifier = Modifier.semantics { contentDescription = "Rating" }
+                                    )
+                                    Text(text = "Rating", modifier = Modifier.padding(start = 8.dp))
+                                }
 
                                 Spacer(modifier = Modifier.padding(8.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {

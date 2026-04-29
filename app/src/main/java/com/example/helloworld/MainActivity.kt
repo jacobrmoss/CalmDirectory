@@ -27,6 +27,8 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -56,6 +58,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.helloworld.ui.theme.CalmMapsTheme
+import java.net.URLEncoder
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import com.mudita.mmd.components.search_bar.SearchBarDefaultsMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
@@ -107,6 +110,10 @@ class MainActivity : ComponentActivity() {
                             navController = navController,
                             startDestination = "main",
                             modifier = navModifier,
+                            enterTransition = { EnterTransition.None },
+                            exitTransition = { ExitTransition.None },
+                            popEnterTransition = { EnterTransition.None },
+                            popExitTransition = { ExitTransition.None },
                         ) {
                             composable("main") { MainScreen(navController, searchViewModel = searchViewModel) }
                             composable("settings") {
@@ -357,10 +364,15 @@ fun DirectoryTopAppBar(
                     val website = navBackStackEntry?.arguments?.getString("poiWebsite")
                     val lat = navBackStackEntry?.arguments?.getFloat("lat")
                     val lng = navBackStackEntry?.arguments?.getFloat("lng")
-                    val countryFlow = navBackStackEntry.savedStateHandle.getStateFlow("poiCountry", "")
-                    val country by countryFlow.collectAsState()
-                    val phoneFlow = navBackStackEntry.savedStateHandle.getStateFlow("effectivePoiPhone", "")
-                    val phone by phoneFlow.collectAsState()
+                    val country = navBackStackEntry?.arguments?.getString("poiCountry")
+                        ?.replace("%2F", "/")
+                        ?.let { URLDecoder.decode(it, StandardCharsets.UTF_8.toString()) }
+                        ?: ""
+                    val rawPhone = navBackStackEntry?.arguments?.getString("poiPhone")
+                        ?.replace("%2F", "/")
+                        ?.let { URLDecoder.decode(it, StandardCharsets.UTF_8.toString()) }
+                        ?: ""
+                    val phone = if (rawPhone == "NA" || rawPhone == "N/A") "" else rawPhone
 
                     if (website != null) {
                         IconButton(onClick = {
@@ -372,9 +384,11 @@ fun DirectoryTopAppBar(
 
                     if (lat != null && lng != null) {
                         IconButton(onClick = {
-                            val name = navBackStackEntry.arguments?.getString("poiName")
-                            val addr = navBackStackEntry.arguments?.getString("poiAddress")
-                            navController.navigate("map?poiName=$name&poiAddress=$addr&isPlace=true&lat=$lat&lng=$lng")
+                            val name = navBackStackEntry.arguments?.getString("poiName") ?: ""
+                            val addr = navBackStackEntry.arguments?.getString("poiAddress") ?: ""
+                            val encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8.toString())
+                            val encodedAddr = URLEncoder.encode(addr, StandardCharsets.UTF_8.toString())
+                            navController.navigate("map?poiName=$encodedName&poiAddress=$encodedAddr&isPlace=true&lat=$lat&lng=$lng")
                         }) {
                             Icon(Icons.Outlined.Map, contentDescription = "Map", modifier = Modifier.size(28.dp))
                         }

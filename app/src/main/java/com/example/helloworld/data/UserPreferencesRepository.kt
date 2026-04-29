@@ -20,6 +20,7 @@ enum class DistanceUnit {
 enum class SortMode {
     RELEVANCE,
     DISTANCE,
+    RATING,
 }
 
 @Serializable

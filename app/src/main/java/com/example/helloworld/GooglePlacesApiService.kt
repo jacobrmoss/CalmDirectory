@@ -76,6 +76,7 @@ class GooglePlacesApiService(
             when (sortMode) {
                 SortMode.RELEVANCE -> SearchByTextRequest.RankPreference.RELEVANCE
                 SortMode.DISTANCE -> SearchByTextRequest.RankPreference.DISTANCE
+                SortMode.RATING -> SearchByTextRequest.RankPreference.RELEVANCE
             }
         )
         if (lat != 0.0 || lon != 0.0) {
@@ -97,6 +98,9 @@ class GooglePlacesApiService(
                 .let { if (openIn1Hour) it.filter { p -> passesOpenIn1Hour(p, now, target) } else it }
                 .let { if (maxPrice != null) it.filter { p -> (p.priceLevel ?: 0) <= maxPrice } else it }
                 .map { place -> place.toPoi(userLat = lat, userLon = lon) }
+                .let {
+                    if (sortMode == SortMode.RATING) it.sortedByDescending { p -> p.rating ?: -1.0 } else it
+                }
         } catch (e: Exception) {
             Log.e("GooglePlacesApiService", "Error searching for places", e)
             emptyList()
