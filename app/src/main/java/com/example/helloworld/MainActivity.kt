@@ -9,7 +9,10 @@ import android.os.Bundle
 import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -39,6 +42,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -60,6 +64,7 @@ import androidx.navigation.navArgument
 import com.example.helloworld.ui.theme.CalmMapsTheme
 import java.net.URLEncoder
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
+import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
 import com.mudita.mmd.components.search_bar.SearchBarDefaultsMMD
 import com.mudita.mmd.components.top_app_bar.TopAppBarMMD
 import java.net.URLDecoder
@@ -201,7 +206,21 @@ class MainActivity : ComponentActivity() {
                                 val poiLat: Double = backStackEntry.arguments?.getFloat("lat")?.toDouble() ?: 0.0
                                 val poiLng: Double = backStackEntry.arguments?.getFloat("lng")?.toDouble() ?: 0.0
 
-                                NavigationScreen(navController, poiName, poiAddress, isPlace, poiLat, poiLng)
+                                var navReady by remember { mutableStateOf(false) }
+                                LaunchedEffect(Unit) { navReady = true }
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(MaterialTheme.colorScheme.surface),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    if (navReady) {
+                                        NavigationScreen(navController, poiName, poiAddress, isPlace, poiLat, poiLng)
+                                    } else {
+                                        CircularProgressIndicatorMMD()
+                                    }
+                                }
                             }
 
                             composable(

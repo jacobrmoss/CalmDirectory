@@ -329,7 +329,12 @@ fun SettingsScreen(
                                                 index = index,
                                                 count = priceOptions.size
                                             ),
-                                            label = { Text(label) },
+                                            label = {
+                                                Text(
+                                                    text = label,
+                                                    color = if (maxPriceLevel == level) Color.White else Color.Black,
+                                                )
+                                            },
                                             icon = {},
                                             colors = SegmentedButtonDefaults.colors(
                                                 activeContainerColor = Color.Black,
