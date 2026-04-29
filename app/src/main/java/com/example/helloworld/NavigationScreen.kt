@@ -140,7 +140,7 @@ fun NavigationScreen(
     val distanceUnit by userPreferencesRepository.distanceUnit.collectAsState(initial = DistanceUnit.IMPERIAL)
     val useDeviceLocation by userPreferencesRepository.useDeviceLocation.collectAsState(initial = true)
     val defaultLocation by userPreferencesRepository.defaultLocation.collectAsState(initial = null)
-    val geocodingService = remember { HereGeocodingService(userPreferencesRepository) }
+    val geocodingService = remember { GoogleGeocodingService() }
 
     var currentUserLocation by remember { mutableStateOf<android.location.Location?>(null) }
     LaunchedEffect(useDeviceLocation, defaultLocation) {

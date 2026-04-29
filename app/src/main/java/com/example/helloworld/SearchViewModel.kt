@@ -19,9 +19,9 @@ import kotlinx.coroutines.launch
 
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
     private val userPreferencesRepository = UserPreferencesRepository(application)
-    private val backend: PlacesBackend = HerePlacesApiService(userPreferencesRepository)
+    private val backend: PlacesBackend = GooglePlacesApiService(application, userPreferencesRepository)
     private val locationService = LocationService(application)
-    private val geocodingService = HereGeocodingService(userPreferencesRepository)
+    private val geocodingService = GoogleGeocodingService()
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery

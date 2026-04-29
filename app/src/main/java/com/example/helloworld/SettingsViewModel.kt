@@ -18,8 +18,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private val locationService = LocationService(application)
     private val userPreferencesRepository = UserPreferencesRepository(application)
-    private val geocodingService = HereGeocodingService(userPreferencesRepository)
-    private val backend: PlacesBackend = HerePlacesApiService(userPreferencesRepository)
+    private val geocodingService = GoogleGeocodingService()
+    private val backend: PlacesBackend = GooglePlacesApiService(application, userPreferencesRepository)
 
     private val _currentLocation = MutableStateFlow("Fetching location...")
     val currentLocation: StateFlow<String> = _currentLocation

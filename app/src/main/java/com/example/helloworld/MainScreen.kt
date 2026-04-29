@@ -42,7 +42,7 @@ fun MainScreen(
 
     val locationRepository = remember { LocationRepository(context) }
     val userPreferencesRepository = remember { UserPreferencesRepository(context) }
-    val geocodingService = remember { HereGeocodingService(userPreferencesRepository) }
+    val geocodingService = remember { GoogleGeocodingService() }
 
     val useDeviceLocation by userPreferencesRepository.useDeviceLocation.collectAsState(initial = false)
     val defaultLocation by userPreferencesRepository.defaultLocation.collectAsState(initial = null)

@@ -12,5 +12,5 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    val apiKey: StateFlow<String?> = MutableStateFlow(BuildConfig.HERE_API_KEY.ifEmpty { null })
+    val apiKey: StateFlow<String?> = MutableStateFlow(BuildConfig.GOOGLE_PLACES_API_KEY.ifEmpty { null })
 }
