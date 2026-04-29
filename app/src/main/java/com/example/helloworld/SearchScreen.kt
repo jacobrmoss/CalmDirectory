@@ -7,9 +7,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarHalf
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -19,12 +23,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.helloworld.data.DistanceUnit
+import com.example.helloworld.util.decomposeStars
+import com.example.helloworld.util.formatKilometers
+import com.example.helloworld.util.formatMiles
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import com.mudita.mmd.components.lazy.LazyColumnMMD
 
 @Composable
 fun SearchScreen(
     searchResults: List<Poi>,
+    showRating: Boolean,
+    distanceUnit: DistanceUnit,
     modifier: Modifier = Modifier,
     onPoiSelected: (Poi) -> Unit
 ) {
@@ -45,6 +55,56 @@ fun SearchScreen(
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
+
+                    if (showRating && poi.rating != null) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            val stars = decomposeStars(poi.rating)
+                            repeat(stars.full) {
+                                Icon(
+                                    imageVector = Icons.Filled.Star,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                            if (stars.half) {
+                                Icon(
+                                    imageVector = Icons.Filled.StarHalf,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                            repeat(stars.empty) {
+                                Icon(
+                                    imageVector = Icons.Outlined.StarBorder,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                            if (poi.userRatingCount != null) {
+                                Spacer(modifier = Modifier.size(4.dp))
+                                Text(
+                                    text = "(${"%,d".format(poi.userRatingCount)})",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    val priceText = poi.priceLevel?.takeIf { it in 1..4 }?.let { "$".repeat(it) }
+                    val distanceText = poi.distanceMeters?.let {
+                        if (distanceUnit == DistanceUnit.METRIC) formatKilometers(it) else formatMiles(it)
+                    }
+                    val secondary = listOfNotNull(priceText, distanceText).joinToString(" · ")
+                    if (secondary.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = secondary,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(4.dp))
 

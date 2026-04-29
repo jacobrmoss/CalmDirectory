@@ -6,10 +6,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.helloworld.data.DistanceUnit
+import com.example.helloworld.data.UserPreferencesRepository
 import com.mudita.mmd.components.progress_indicator.CircularProgressIndicatorMMD
 import java.net.URLEncoder
 import java.net.URLDecoder
@@ -26,6 +30,10 @@ fun SearchScreenHost(
     val searchQuery by searchViewModel.searchQuery.collectAsState()
     val searchResults by searchViewModel.searchResults.collectAsState()
     val isLoading by searchViewModel.isLoading.collectAsState()
+    val context = LocalContext.current
+    val userPreferencesRepository = remember { UserPreferencesRepository(context) }
+    val showRating by userPreferencesRepository.showRating.collectAsState(initial = true)
+    val distanceUnit by userPreferencesRepository.distanceUnit.collectAsState(initial = DistanceUnit.IMPERIAL)
 
     val handlePoiSelection: (Poi) -> Unit = { poi ->
         if (saveAs == "NEW_QUICK_LOCATION") {
@@ -81,6 +89,8 @@ fun SearchScreenHost(
     } else {
         SearchScreen(
             searchResults = searchResults,
+            showRating = showRating,
+            distanceUnit = distanceUnit,
             onPoiSelected = handlePoiSelection
         )
     }
