@@ -82,11 +82,10 @@ fun SearchFilterControls(modifier: Modifier = Modifier) {
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
             )
-            Spacer(modifier = Modifier.padding(8.dp))
             HorizontalDividerMMD(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
         }
 
-        Spacer(modifier = Modifier.padding(16.dp))
+        Spacer(modifier = Modifier.padding(4.dp))
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
             Text(text = "Search filters", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.padding(4.dp))
@@ -210,6 +209,7 @@ fun SearchFilterControls(modifier: Modifier = Modifier) {
                     )
                 }
             }
+            Spacer(modifier = Modifier.padding(8.dp))
         }
     }
 }

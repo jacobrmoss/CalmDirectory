@@ -166,7 +166,7 @@ fun MainScreen(
             }
         }
 
-        Column {
+        Column(modifier = Modifier.fillMaxSize()) {
             LandingScreen(
                 modifier = Modifier,
                 quickLocations = quickLocations,

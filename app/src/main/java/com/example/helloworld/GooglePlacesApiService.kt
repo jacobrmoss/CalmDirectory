@@ -13,12 +13,14 @@ import com.google.android.libraries.places.api.Places
 import com.google.android.libraries.places.api.model.AutocompleteSessionToken
 import com.google.android.libraries.places.api.model.CircularBounds
 import com.google.android.libraries.places.api.model.Place
+import com.google.android.libraries.places.api.model.RectangularBounds
 import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest
 import com.google.android.libraries.places.api.net.PlacesClient
 import com.google.android.libraries.places.api.net.SearchByTextRequest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 import java.time.LocalDateTime
+import kotlin.math.cos
 import com.google.android.libraries.places.api.model.DayOfWeek as PlacesDayOfWeek
 import java.time.DayOfWeek as JavaDayOfWeek
 
@@ -83,29 +85,36 @@ class GooglePlacesApiService(
             }
         )
         if (lat != 0.0 || lon != 0.0) {
-            val center = LatLng(lat, lon)
             val sliderMaxed = radiusMiles >= MAX_SEARCH_RADIUS_MILES
+            // Places SDK 3.5 only accepts RectangularBounds for setLocationRestriction —
+            // CircularBounds throws IllegalArgumentException there. We use Rectangular for
+            // restriction and Circular for bias.
+            val restrictionMiles = when {
+                sortMode == SortMode.DISTANCE && sliderMaxed -> DISTANCE_AT_MAX_RADIUS_MILES
+                else -> radiusMiles
+            }
+            val latDeg = restrictionMiles / 69.0
+            val lonDeg = restrictionMiles / (cos(Math.toRadians(lat)) * 69.0)
+            val rectBounds = RectangularBounds.newInstance(
+                LatLng(lat - latDeg, lon - lonDeg),
+                LatLng(lat + latDeg, lon + lonDeg),
+            )
             when {
                 sortMode == SortMode.DISTANCE -> {
-                    // Places SDK requires locationRestriction (not bias) for DISTANCE rank.
-                    // At slider max, expand to DISTANCE_AT_MAX_RADIUS_MILES so distant
-                    // results still surface — the 20mi cap is a UI ceiling, not user intent.
-                    val effectiveMiles = if (sliderMaxed) DISTANCE_AT_MAX_RADIUS_MILES else radiusMiles
-                    builder.setLocationRestriction(
-                        CircularBounds.newInstance(center, effectiveMiles * METERS_PER_MILE)
-                    )
+                    // DISTANCE rank requires setLocationRestriction. At slider max we
+                    // expand to DISTANCE_AT_MAX_RADIUS_MILES so distant matches still
+                    // surface — the 20mi cap is a UI ceiling, not user intent.
+                    builder.setLocationRestriction(rectBounds)
                 }
                 sliderMaxed -> {
                     // At slider max for relevance/rating, prefer-not-restrict so the user
                     // isn't walled off from rare distant matches.
                     builder.setLocationBias(
-                        CircularBounds.newInstance(center, radiusMiles * METERS_PER_MILE)
+                        CircularBounds.newInstance(LatLng(lat, lon), radiusMiles * METERS_PER_MILE)
                     )
                 }
                 else -> {
-                    builder.setLocationRestriction(
-                        CircularBounds.newInstance(center, radiusMiles * METERS_PER_MILE)
-                    )
+                    builder.setLocationRestriction(rectBounds)
                 }
             }
         }

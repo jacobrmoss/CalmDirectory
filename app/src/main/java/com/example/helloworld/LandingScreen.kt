@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Home
@@ -30,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import com.example.helloworld.data.QuickLocation
 import com.mudita.mmd.components.chips.AssistChipMMD
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
-import com.mudita.mmd.components.lazy.LazyColumnMMD
 
 @Composable
 fun LandingScreen(
@@ -101,16 +102,15 @@ fun LandingScreen(
             modifier = Modifier.padding(start = 16.dp)
         )
 
-        LazyColumnMMD(
+        Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
         ) {
-            item {
-                SearchFilterControls(
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            SearchFilterControls(
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
