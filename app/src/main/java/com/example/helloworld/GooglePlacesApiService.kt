@@ -128,7 +128,14 @@ class GooglePlacesApiService(
                 .let { if (maxPrice != null) it.filter { p -> (p.priceLevel ?: 0) <= maxPrice } else it }
                 .map { place -> place.toPoi(userLat = lat, userLon = lon) }
                 .let {
-                    if (sortMode == SortMode.RATING) it.sortedByDescending { p -> p.rating ?: -1.0 } else it
+                    when (sortMode) {
+                        // Client-side sort guarantees the requested order regardless of
+                        // whether the SDK honors RankPreference (it doesn't always —
+                        // particularly DISTANCE with rectangular restriction).
+                        SortMode.DISTANCE -> it.sortedBy { p -> p.distanceMeters ?: Double.MAX_VALUE }
+                        SortMode.RATING -> it.sortedByDescending { p -> p.rating ?: -1.0 }
+                        SortMode.RELEVANCE -> it
+                    }
                 }
         } catch (e: Exception) {
             Log.e("GooglePlacesApiService", "Error searching for places", e)

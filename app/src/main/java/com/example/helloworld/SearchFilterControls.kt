@@ -18,43 +18,40 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.helloworld.data.DistanceUnit
 import com.example.helloworld.data.SortMode
-import com.example.helloworld.data.UserPreferencesRepository
 import com.mudita.mmd.components.divider.HorizontalDividerMMD
 import com.mudita.mmd.components.radio_button.RadioButtonMMD
 import com.mudita.mmd.components.slider.SliderMMD
 import com.mudita.mmd.components.switcher.SwitchMMD
-import kotlinx.coroutines.launch
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchFilterControls(modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val userPreferencesRepository = remember { UserPreferencesRepository(context) }
-    val coroutineScope = rememberCoroutineScope()
+fun SearchFilterControls(
+    modifier: Modifier = Modifier,
+    viewModel: HomeFiltersViewModel = viewModel(),
+) {
     val interactionSource = remember { MutableInteractionSource() }
 
-    val searchRadius by userPreferencesRepository.searchRadius.collectAsState(initial = 10)
+    val searchRadius by viewModel.searchRadius.collectAsState()
     var sliderValue by remember(searchRadius) { mutableStateOf(searchRadius.toFloat()) }
-    val distanceUnit by userPreferencesRepository.distanceUnit.collectAsState(initial = DistanceUnit.IMPERIAL)
-    val openNow by userPreferencesRepository.openNow.collectAsState(initial = false)
-    val openIn1Hour by userPreferencesRepository.openIn1Hour.collectAsState(initial = false)
-    val sortMode by userPreferencesRepository.sortMode.collectAsState(initial = SortMode.RELEVANCE)
-    val showRating by userPreferencesRepository.showRating.collectAsState(initial = true)
-    val maxPriceLevel by userPreferencesRepository.maxPriceLevel.collectAsState(initial = null)
+    val distanceUnit by viewModel.distanceUnit.collectAsState()
+    val openNow by viewModel.openNow.collectAsState()
+    val openIn1Hour by viewModel.openIn1Hour.collectAsState()
+    val sortMode by viewModel.sortMode.collectAsState()
+    val showRating by viewModel.showRating.collectAsState()
+    val maxPriceLevel by viewModel.maxPriceLevel.collectAsState()
 
     Column(modifier = modifier) {
         Spacer(modifier = Modifier.padding(8.dp))
@@ -70,11 +67,7 @@ fun SearchFilterControls(modifier: Modifier = Modifier) {
             SliderMMD(
                 value = sliderValue,
                 onValueChange = { sliderValue = it },
-                onValueChangeFinished = {
-                    coroutineScope.launch {
-                        userPreferencesRepository.saveSearchRadius(sliderValue.toInt())
-                    }
-                },
+                onValueChangeFinished = { viewModel.setSearchRadius(sliderValue.toInt()) },
                 valueRange = 1f..20f,
                 steps = 18,
                 interactionSource = interactionSource,
@@ -94,9 +87,7 @@ fun SearchFilterControls(modifier: Modifier = Modifier) {
                 Text(text = "Open now", fontSize = 16.sp, modifier = Modifier.weight(1f))
                 SwitchMMD(
                     checked = openNow,
-                    onCheckedChange = { isChecked ->
-                        coroutineScope.launch { userPreferencesRepository.saveOpenNow(isChecked) }
-                    }
+                    onCheckedChange = { viewModel.setOpenNow(it) }
                 )
             }
             Spacer(modifier = Modifier.padding(4.dp))
@@ -104,9 +95,7 @@ fun SearchFilterControls(modifier: Modifier = Modifier) {
                 Text(text = "Open for the next hour", fontSize = 16.sp, modifier = Modifier.weight(1f))
                 SwitchMMD(
                     checked = openIn1Hour,
-                    onCheckedChange = { isChecked ->
-                        coroutineScope.launch { userPreferencesRepository.saveOpenIn1Hour(isChecked) }
-                    }
+                    onCheckedChange = { viewModel.setOpenIn1Hour(it) }
                 )
             }
 
@@ -116,9 +105,7 @@ fun SearchFilterControls(modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
-                        coroutineScope.launch { userPreferencesRepository.saveSortMode(SortMode.RELEVANCE) }
-                    }
+                    .clickable { viewModel.setSortMode(SortMode.RELEVANCE) }
             ) {
                 RadioButtonMMD(
                     selected = sortMode == SortMode.RELEVANCE,
@@ -132,9 +119,7 @@ fun SearchFilterControls(modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 4.dp)
-                    .clickable {
-                        coroutineScope.launch { userPreferencesRepository.saveSortMode(SortMode.DISTANCE) }
-                    }
+                    .clickable { viewModel.setSortMode(SortMode.DISTANCE) }
             ) {
                 RadioButtonMMD(
                     selected = sortMode == SortMode.DISTANCE,
@@ -148,9 +133,7 @@ fun SearchFilterControls(modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 4.dp)
-                    .clickable {
-                        coroutineScope.launch { userPreferencesRepository.saveSortMode(SortMode.RATING) }
-                    }
+                    .clickable { viewModel.setSortMode(SortMode.RATING) }
             ) {
                 RadioButtonMMD(
                     selected = sortMode == SortMode.RATING,
@@ -165,9 +148,7 @@ fun SearchFilterControls(modifier: Modifier = Modifier) {
                 Text(text = "Show ratings", fontSize = 14.sp, modifier = Modifier.weight(1f))
                 SwitchMMD(
                     checked = showRating,
-                    onCheckedChange = { isChecked ->
-                        coroutineScope.launch { userPreferencesRepository.saveShowRating(isChecked) }
-                    }
+                    onCheckedChange = { viewModel.setShowRating(it) }
                 )
             }
 
@@ -185,9 +166,7 @@ fun SearchFilterControls(modifier: Modifier = Modifier) {
                 priceOptions.forEachIndexed { index, (level, label) ->
                     SegmentedButton(
                         selected = maxPriceLevel == level,
-                        onClick = {
-                            coroutineScope.launch { userPreferencesRepository.saveMaxPriceLevel(level) }
-                        },
+                        onClick = { viewModel.setMaxPriceLevel(level) },
                         shape = SegmentedButtonDefaults.itemShape(
                             index = index,
                             count = priceOptions.size

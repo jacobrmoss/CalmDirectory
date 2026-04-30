@@ -1,5 +1,6 @@
 package com.example.helloworld
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +29,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.helloworld.data.QuickLocation
 import com.mudita.mmd.components.chips.AssistChipMMD
@@ -102,15 +108,39 @@ fun LandingScreen(
             modifier = Modifier.padding(start = 16.dp)
         )
 
+        val scrollState = rememberScrollState()
         Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
+                .verticalScrollbar(scrollState)
         ) {
             SearchFilterControls(
                 modifier = Modifier.fillMaxWidth()
             )
         }
     }
+}
+
+private fun Modifier.verticalScrollbar(
+    scrollState: ScrollState,
+    width: Dp = 4.dp,
+    color: Color = Color.Black,
+): Modifier = drawWithContent {
+    drawContent()
+    val maxScroll = scrollState.maxValue
+    if (maxScroll <= 0) return@drawWithContent
+
+    val viewportHeight = size.height
+    val totalHeight = viewportHeight + maxScroll
+    val thumbHeight = (viewportHeight * (viewportHeight / totalHeight)).coerceAtLeast(24f)
+    val scrollFraction = scrollState.value.toFloat() / maxScroll
+    val thumbTop = (viewportHeight - thumbHeight) * scrollFraction
+    val widthPx = width.toPx()
+    drawRect(
+        color = color,
+        topLeft = Offset(size.width - widthPx, thumbTop),
+        size = Size(widthPx, thumbHeight),
+    )
 }
