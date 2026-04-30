@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -47,6 +48,20 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 }
         }
 
+        viewModelScope.launch {
+            combine(
+                userPreferencesRepository.searchRadius,
+                userPreferencesRepository.openNow,
+                userPreferencesRepository.openIn1Hour,
+                userPreferencesRepository.sortMode,
+                userPreferencesRepository.maxPriceLevel,
+            ) { _, _, _, _, _ -> Unit }
+                .drop(1)
+                .collect {
+                    val q = _searchQuery.value
+                    if (q.isNotBlank()) onSearchQueryChange(q)
+                }
+        }
     }
 
     fun onSearchQueryChange(query: String) {

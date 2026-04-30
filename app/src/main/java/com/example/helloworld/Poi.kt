@@ -9,7 +9,6 @@ data class Poi(
     val website: String?,
     val lat: Double?,
     val lng: Double?,
-    val isOutsideSearchRadius: Boolean = false,
     val isPlace: Boolean = true,
     val rating: Double? = null,
     val userRatingCount: Int? = null,

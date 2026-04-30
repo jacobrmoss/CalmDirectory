@@ -34,7 +34,6 @@ import java.nio.charset.StandardCharsets
 @Composable
 fun MainScreen(
     navController: NavController,
-    searchViewModel: SearchViewModel? = null,
     mainViewModel: MainViewModel = viewModel()
 ) {
     val isLoading by mainViewModel.isLoading.collectAsState()
@@ -44,9 +43,6 @@ fun MainScreen(
     val locationRepository = remember { LocationRepository(context) }
     val userPreferencesRepository = remember { UserPreferencesRepository(context) }
     val geocodingService = remember { GoogleGeocodingService() }
-
-    val useDeviceLocation by userPreferencesRepository.useDeviceLocation.collectAsState(initial = false)
-    val defaultLocation by userPreferencesRepository.defaultLocation.collectAsState(initial = null)
 
     val locationGate by remember(userPreferencesRepository) {
         userPreferencesRepository.useDeviceLocation
@@ -188,11 +184,6 @@ fun MainScreen(
 
                         navController.navigate("map?poiName=$encodedName&poiAddress=$encodedAddress&isPlace=false&lat=$lat&lng=$lng")
                     }
-                },
-                onCategorySelected = { category ->
-                    searchViewModel?.resetSearch()
-                    val encodedCategory = URLEncoder.encode(category, StandardCharsets.UTF_8.toString())
-                    navController.navigate("search?query=$encodedCategory&autoFocus=false")
                 }
             )
         }

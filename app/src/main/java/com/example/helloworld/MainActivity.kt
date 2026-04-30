@@ -120,7 +120,7 @@ class MainActivity : ComponentActivity() {
                             popEnterTransition = { EnterTransition.None },
                             popExitTransition = { ExitTransition.None },
                         ) {
-                            composable("main") { MainScreen(navController, searchViewModel = searchViewModel) }
+                            composable("main") { MainScreen(navController) }
                             composable("settings") {
                                 val scrollToLocationSettings =
                                     navController.previousBackStackEntry?.savedStateHandle?.get<Boolean>(
